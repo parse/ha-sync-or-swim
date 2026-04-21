@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "role": {
+        "title": "Select role",
+        "description": "Choose whether this installation has a camera (Producer) or reads from the shared backend (Consumer).",
+        "data": { "role": "Role" }
+      },
+      "producer": {
+        "title": "Producer configuration",
+        "data": {
+          "installation_id": "Installation ID",
+          "camera_entity": "Camera entity",
+          "light_entity": "Spotlight entity",
+          "openai_api_key": "OpenAI API key",
+          "push_token": "Push Token",
+          "backend_url": "Backend URL",
+          "scan_interval": "Scan interval (minutes)",
+          "image_detail": "Image detail",
+          "staleness_threshold": "Staleness threshold (minutes)"
+        }
+      },
+      "consumer": {
+        "title": "Consumer configuration",
+        "data": {
+          "installation_id": "Installation ID",
+          "backend_url": "Backend URL",
+          "poll_interval": "Poll interval (minutes)",
+          "staleness_threshold": "Staleness threshold (minutes)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to backend",
+      "invalid_api_key": "Invalid OpenAI API key",
+      "invalid_entity": "Entity not found or wrong type",
+      "unknown": "Unexpected error"
+    }
+  }
+}

@@ -1,0 +1,229 @@
+{
+  "id": "b46adedd-56e6-4299-a65e-602e88dbc17a",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.installations": {
+      "name": "installations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "last_seen": {
+          "name": "last_seen",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.measurements": {
+      "name": "measurements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "installation_id": {
+          "name": "installation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "captured_at": {
+          "name": "captured_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pushed_at": {
+          "name": "pushed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "chlorine_status": {
+          "name": "chlorine_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chlorine_diagnosis": {
+          "name": "chlorine_diagnosis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chlorine_pattern": {
+          "name": "chlorine_pattern",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chlorine_blinking": {
+          "name": "chlorine_blinking",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chlorine_solid": {
+          "name": "chlorine_solid",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chlorine_summary": {
+          "name": "chlorine_summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "chlorine_action": {
+          "name": "chlorine_action",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "chlorine_recommended": {
+          "name": "chlorine_recommended",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ph_status": {
+          "name": "ph_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ph_diagnosis": {
+          "name": "ph_diagnosis",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ph_pattern": {
+          "name": "ph_pattern",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ph_blinking": {
+          "name": "ph_blinking",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ph_solid": {
+          "name": "ph_solid",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ph_summary": {
+          "name": "ph_summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ph_action": {
+          "name": "ph_action",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "ph_recommended": {
+          "name": "ph_recommended",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_response": {
+          "name": "raw_response",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_measurements_inst_captured": {
+          "name": "idx_measurements_inst_captured",
+          "columns": [
+            {
+              "expression": "installation_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "captured_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "measurements_installation_id_installations_id_fk": {
+          "name": "measurements_installation_id_installations_id_fk",
+          "tableFrom": "measurements",
+          "tableTo": "installations",
+          "columnsFrom": [
+            "installation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

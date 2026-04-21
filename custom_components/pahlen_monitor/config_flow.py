@@ -1,0 +1,151 @@
+import logging
+
+import aiohttp
+import voluptuous as vol
+from homeassistant import config_entries
+from openai import AsyncOpenAI
+
+from .const import (
+    CONF_BACKEND_URL,
+    CONF_CAMERA_ENTITY,
+    CONF_IMAGE_DETAIL,
+    CONF_INSTALLATION_ID,
+    CONF_LIGHT_ENTITY,
+    CONF_OPENAI_API_KEY,
+    CONF_POLL_INTERVAL,
+    CONF_PUSH_TOKEN,
+    CONF_ROLE,
+    CONF_SCAN_INTERVAL,
+    CONF_STALENESS_THRESHOLD,
+    DEFAULT_IMAGE_DETAIL,
+    DEFAULT_POLL_INTERVAL,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_STALENESS_THRESHOLD,
+    DOMAIN,
+    ROLE_CONSUMER,
+    ROLE_PRODUCER,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    VERSION = 1
+
+    def __init__(self):
+        self._data = {}
+
+    async def async_step_user(self, user_input=None):
+        if user_input is not None:
+            self._data.update(user_input)
+            if user_input[CONF_ROLE] == ROLE_PRODUCER:
+                return await self.async_step_producer()
+            return await self.async_step_consumer()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_ROLE): vol.In([ROLE_PRODUCER, ROLE_CONSUMER])}
+            ),
+        )
+
+    async def async_step_producer(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            installation_id = user_input[CONF_INSTALLATION_ID]
+            await self.async_set_unique_id(installation_id)
+            self._abort_if_unique_id_configured()
+
+            # Validate backend URL
+            if not await self._test_backend_url(user_input[CONF_BACKEND_URL]):
+                errors["base"] = "cannot_connect"
+
+            # Validate entities
+            if not self.hass.states.get(user_input[CONF_CAMERA_ENTITY]):
+                errors[CONF_CAMERA_ENTITY] = "invalid_entity"
+            if not self.hass.states.get(user_input[CONF_LIGHT_ENTITY]):
+                errors[CONF_LIGHT_ENTITY] = "invalid_entity"
+
+            # Validate OpenAI API key
+            if not errors and not await self._test_openai_key(
+                user_input[CONF_OPENAI_API_KEY]
+            ):
+                errors[CONF_OPENAI_API_KEY] = "invalid_api_key"
+
+            if not errors:
+                self._data.update(user_input)
+                return self.async_create_entry(title=installation_id, data=self._data)
+
+        return self.async_show_form(
+            step_id="producer",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_INSTALLATION_ID): str,
+                    vol.Required(CONF_CAMERA_ENTITY): str,
+                    vol.Required(CONF_LIGHT_ENTITY): str,
+                    vol.Required(CONF_OPENAI_API_KEY): str,
+                    vol.Required(CONF_PUSH_TOKEN): str,
+                    vol.Required(CONF_BACKEND_URL): str,
+                    vol.Optional(
+                        CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
+                    ): int,
+                    vol.Optional(
+                        CONF_IMAGE_DETAIL, default=DEFAULT_IMAGE_DETAIL
+                    ): vol.In(["low", "high", "auto"]),
+                    vol.Optional(
+                        CONF_STALENESS_THRESHOLD, default=DEFAULT_STALENESS_THRESHOLD
+                    ): int,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_consumer(self, user_input=None):
+        errors = {}
+        if user_input is not None:
+            installation_id = user_input[CONF_INSTALLATION_ID]
+            await self.async_set_unique_id(installation_id)
+            self._abort_if_unique_id_configured()
+
+            # Validate backend URL
+            if not await self._test_backend_url(user_input[CONF_BACKEND_URL]):
+                errors["base"] = "cannot_connect"
+
+            if not errors:
+                self._data.update(user_input)
+                return self.async_create_entry(title=installation_id, data=self._data)
+
+        return self.async_show_form(
+            step_id="consumer",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_INSTALLATION_ID): str,
+                    vol.Required(CONF_BACKEND_URL): str,
+                    vol.Optional(
+                        CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL
+                    ): int,
+                    vol.Optional(
+                        CONF_STALENESS_THRESHOLD, default=DEFAULT_STALENESS_THRESHOLD
+                    ): int,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def _test_backend_url(self, url):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{url.rstrip('/')}/health", timeout=10
+                ) as response:
+                    return response.status == 200
+        except Exception:
+            return False
+
+    async def _test_openai_key(self, api_key):
+        try:
+            client = AsyncOpenAI(api_key=api_key)
+            await client.models.list()
+            return True
+        except Exception:
+            return False

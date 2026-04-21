@@ -1,0 +1,64 @@
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { InstallationIdSchema, UnitAnalysisSchema } from "../validation.js";
+
+const app = new OpenAPIHono();
+
+const debugRoute = createRoute({
+  method: "get",
+  path: "/{installation_id}",
+  request: {
+    params: z.object({
+      installation_id: InstallationIdSchema,
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            installation_id: z.string(),
+            captured_at: z.iso.datetime().optional(),
+            pushed_at: z.iso.datetime().optional(),
+            chlorine: UnitAnalysisSchema,
+            ph: UnitAnalysisSchema,
+            debug: z.boolean(),
+          }),
+        },
+      },
+      description: "Mock measurement data",
+    },
+  },
+});
+
+app.openapi(debugRoute, (c) => {
+  const { installation_id: installationId } = c.req.valid("param");
+
+  return c.json({
+    installation_id: installationId,
+    captured_at: new Date().toISOString(),
+    pushed_at: new Date().toISOString(),
+    chlorine: {
+      status: "ok",
+      diagnosis: "Auto mode",
+      pattern_detected: "LED 4 solid",
+      blinking_leds: [],
+      solid_leds: ["LED 4 – green"],
+      summary: "Normal operation.",
+      action_required: false,
+      recommended_action: "No action required",
+    },
+    ph: {
+      status: "warning",
+      diagnosis: "Standby mode",
+      pattern_detected: "LED 5 blinking",
+      blinking_leds: ["LED 5 – yellow"],
+      solid_leds: [],
+      summary: "pH unit in standby.",
+      action_required: false,
+      recommended_action: "Check if the pump is running",
+    },
+    debug: true,
+  });
+});
+
+export default app;

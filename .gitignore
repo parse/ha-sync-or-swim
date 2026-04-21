@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# Node
+backend/node_modules/
+backend/dist/
+
+# Env
+.env
+.env.*

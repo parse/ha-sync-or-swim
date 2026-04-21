@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "role": {
+        "title": "Välj roll",
+        "description": "Välj om denna installation har en kamera (Producent) eller läser från den delade backend-servern (Konsument).",
+        "data": { "role": "Roll" }
+      },
+      "producer": {
+        "title": "Producent-konfiguration",
+        "data": {
+          "installation_id": "Installations-ID",
+          "camera_entity": "Kameraentitet",
+          "light_entity": "Spotlightsentitet (kamerans lampa)",
+          "openai_api_key": "OpenAI API-nyckel",
+          "push_token": "Säkerhetstoken (Push Token)",
+          "backend_url": "Backend-URL",
+          "scan_interval": "Analysintervall (minuter)",
+          "image_detail": "Bilddetalj",
+          "staleness_threshold": "Maximal dataålder (minuter)"
+        }
+      },
+      "consumer": {
+        "title": "Konsument-konfiguration",
+        "data": {
+          "installation_id": "Installations-ID",
+          "backend_url": "Backend-URL",
+          "poll_interval": "Uppdateringsintervall (minuter)",
+          "staleness_threshold": "Maximal dataålder (minuter)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Kan inte ansluta till backend",
+      "invalid_api_key": "Ogiltig OpenAI API-nyckel",
+      "invalid_entity": "Entitet hittades inte eller har fel typ",
+      "unknown": "Oväntat fel"
+    }
+  }
+}

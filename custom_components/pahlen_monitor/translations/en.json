@@ -36,6 +36,7 @@
     "error": {
       "cannot_connect": "Cannot connect to backend",
       "invalid_api_key": "Invalid OpenAI API key",
+      "invalid_installation_id": "Use only lowercase letters, numbers, and hyphens for the installation ID",
       "invalid_entity": "Entity not found or wrong type",
       "unknown": "Unexpected error"
     }

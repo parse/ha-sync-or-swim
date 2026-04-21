@@ -121,7 +121,12 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                     timeout=30,
                 ) as response:
                     if response.status not in (200, 201):
-                        _LOGGER.error("Failed to push to backend: %s", response.status)
+                        response_body = await response.text()
+                        _LOGGER.error(
+                            "Failed to push to backend: %s %s",
+                            response.status,
+                            response_body,
+                        )
 
             return result
 

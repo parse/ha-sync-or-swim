@@ -36,6 +36,7 @@
     "error": {
       "cannot_connect": "Kan inte ansluta till backend",
       "invalid_api_key": "Ogiltig OpenAI API-nyckel",
+      "invalid_installation_id": "Använd bara små bokstäver, siffror och bindestreck för installations-ID",
       "invalid_entity": "Entitet hittades inte eller har fel typ",
       "unknown": "Oväntat fel"
     }

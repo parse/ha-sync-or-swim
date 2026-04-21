@@ -1,4 +1,5 @@
 import logging
+import re
 
 import aiohttp
 import voluptuous as vol
@@ -23,11 +24,13 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
+    INSTALLATION_ID_PATTERN,
     ROLE_CONSUMER,
     ROLE_PRODUCER,
 )
 
 _LOGGER = logging.getLogger(__name__)
+INSTALLATION_ID_REGEX = re.compile(INSTALLATION_ID_PATTERN)
 
 
 class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -54,11 +57,16 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             installation_id = user_input[CONF_INSTALLATION_ID]
+            if not INSTALLATION_ID_REGEX.fullmatch(installation_id):
+                errors[CONF_INSTALLATION_ID] = "invalid_installation_id"
+
             await self.async_set_unique_id(installation_id)
             self._abort_if_unique_id_configured()
 
             # Validate backend URL
-            if not await self._test_backend_url(user_input[CONF_BACKEND_URL]):
+            if not errors and not await self._test_backend_url(
+                user_input[CONF_BACKEND_URL]
+            ):
                 errors["base"] = "cannot_connect"
 
             # Validate entities
@@ -109,11 +117,16 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
         if user_input is not None:
             installation_id = user_input[CONF_INSTALLATION_ID]
+            if not INSTALLATION_ID_REGEX.fullmatch(installation_id):
+                errors[CONF_INSTALLATION_ID] = "invalid_installation_id"
+
             await self.async_set_unique_id(installation_id)
             self._abort_if_unique_id_configured()
 
             # Validate backend URL
-            if not await self._test_backend_url(user_input[CONF_BACKEND_URL]):
+            if not errors and not await self._test_backend_url(
+                user_input[CONF_BACKEND_URL]
+            ):
                 errors["base"] = "cannot_connect"
 
             if not errors:

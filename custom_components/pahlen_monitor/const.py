@@ -1,4 +1,5 @@
 DOMAIN = "pahlen_monitor"
+INSTALLATION_ID_PATTERN = r"^[a-z0-9-]{1,64}$"
 
 # Roles
 ROLE_PRODUCER = "producer"

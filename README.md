@@ -24,6 +24,11 @@ Monitor your Pahlen pool dosing units using a camera and AI. This project uses H
 2. Install the "Pahlen Monitor" integration.
 3. Restart Home Assistant.
 
+## Contract
+- The backend OpenAPI contract is generated to `backend/openapi.json` with `npm run generate:openapi` from `backend/`.
+- Generate the Python types used by the Home Assistant integration with `python3 scripts/generate_python_contract.py`.
+- Run `python3 scripts/check_openapi_contract.py` from the repository root to verify `custom_components/pahlen_monitor/generated_api.py` is up to date with `backend/openapi.json`.
+
 ### 2. Configuration
 - **Producer:** Add the integration and select "Producer". You'll need your OpenAI API key, camera entity, and backend URL.
 - **Consumer:** Add the integration and select "Consumer". You only need the backend URL and the same Installation ID as the producer.

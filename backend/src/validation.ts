@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 
-export const UnitAnalysisSchema = z
+const UnitAnalysisSchema = z
   .object({
     status: z.enum(["ok", "warning", "error", "unknown"]),
     diagnosis: z.string().nullable(),
@@ -18,9 +18,20 @@ export const PushBodySchema = z
     captured_at: z.iso.datetime(),
     chlorine: UnitAnalysisSchema,
     ph: UnitAnalysisSchema,
-    raw_response: z.string().optional(),
+    raw_response: z.string().nullable().optional(),
   })
   .openapi("PushBody");
+
+export const LatestMeasurementSchema = z
+  .object({
+    installation_id: z.string(),
+    captured_at: z.iso.datetime().nullable(),
+    pushed_at: z.iso.datetime().nullable(),
+    chlorine: UnitAnalysisSchema,
+    ph: UnitAnalysisSchema,
+    raw_response: z.string().nullable(),
+  })
+  .openapi("LatestMeasurement");
 
 export const InstallationIdSchema = z
   .string()

@@ -1,0 +1,297 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Pahlen Monitor API",
+    "version": "1.0.0"
+  },
+  "components": {
+    "schemas": {
+      "PushBody": {
+        "type": "object",
+        "properties": {
+          "captured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "chlorine": {
+            "$ref": "#/components/schemas/UnitAnalysis"
+          },
+          "ph": {
+            "$ref": "#/components/schemas/UnitAnalysis"
+          },
+          "raw_response": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "captured_at",
+          "chlorine",
+          "ph"
+        ]
+      },
+      "UnitAnalysis": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "warning",
+              "error",
+              "unknown"
+            ]
+          },
+          "diagnosis": {
+            "type": "string",
+            "nullable": true
+          },
+          "pattern_detected": {
+            "type": "string",
+            "nullable": true
+          },
+          "blinking_leds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "solid_leds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "summary": {
+            "type": "string"
+          },
+          "action_required": {
+            "type": "boolean"
+          },
+          "recommended_action": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "diagnosis",
+          "pattern_detected",
+          "blinking_leds",
+          "solid_leds",
+          "summary",
+          "action_required",
+          "recommended_action"
+        ]
+      },
+      "LatestMeasurement": {
+        "type": "object",
+        "properties": {
+          "installation_id": {
+            "type": "string"
+          },
+          "captured_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "pushed_at": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "chlorine": {
+            "$ref": "#/components/schemas/UnitAnalysis"
+          },
+          "ph": {
+            "$ref": "#/components/schemas/UnitAnalysis"
+          },
+          "raw_response": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "installation_id",
+          "captured_at",
+          "pushed_at",
+          "chlorine",
+          "ph",
+          "raw_response"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/push/{installation_id}": {
+      "post": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "example": "my-pool-123"
+            },
+            "required": true,
+            "name": "installation_id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "Bearer your_push_token",
+              "description": "Bearer token for authorized updates"
+            },
+            "required": true,
+            "description": "Bearer token for authorized updates",
+            "name": "authorization",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Measurement created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Database error"
+          }
+        }
+      }
+    },
+    "/latest/{installation_id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "example": "my-pool-123"
+            },
+            "required": true,
+            "name": "installation_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Latest measurement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestMeasurement"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No measurements found"
+          }
+        }
+      }
+    },
+    "/debug/{installation_id}": {
+      "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,64}$",
+              "example": "my-pool-123"
+            },
+            "required": true,
+            "name": "installation_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mock measurement data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/LatestMeasurement"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "debug": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "debug"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/installations": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "List of all installations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "last_seen": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "id"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

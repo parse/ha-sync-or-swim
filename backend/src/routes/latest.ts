@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { db } from "../db.js";
 import { measurements, type UnitAnalysis } from "../schema.js";
 import { eq, desc } from "drizzle-orm";
-import { InstallationIdSchema, UnitAnalysisSchema } from "../validation.js";
+import { InstallationIdSchema, LatestMeasurementSchema } from "../validation.js";
 
 const app = new OpenAPIHono();
 
@@ -18,14 +18,7 @@ const latestRoute = createRoute({
     200: {
       content: {
         "application/json": {
-          schema: z.object({
-            installation_id: z.string(),
-            captured_at: z.iso.datetime().optional(),
-            pushed_at: z.iso.datetime().optional(),
-            chlorine: UnitAnalysisSchema,
-            ph: UnitAnalysisSchema,
-            raw_response: z.string().optional().nullable(),
-          }),
+          schema: LatestMeasurementSchema,
         },
       },
       description: "Latest measurement",

@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
-import { InstallationIdSchema, UnitAnalysisSchema } from "../validation.js";
+import { InstallationIdSchema, LatestMeasurementSchema } from "../validation.js";
 
 const app = new OpenAPIHono();
 
@@ -15,12 +15,7 @@ const debugRoute = createRoute({
     200: {
       content: {
         "application/json": {
-          schema: z.object({
-            installation_id: z.string(),
-            captured_at: z.iso.datetime().optional(),
-            pushed_at: z.iso.datetime().optional(),
-            chlorine: UnitAnalysisSchema,
-            ph: UnitAnalysisSchema,
+          schema: LatestMeasurementSchema.extend({
             debug: z.boolean(),
           }),
         },
@@ -37,6 +32,7 @@ app.openapi(debugRoute, (c) => {
     installation_id: installationId,
     captured_at: new Date().toISOString(),
     pushed_at: new Date().toISOString(),
+    raw_response: null,
     chlorine: {
       status: "ok",
       diagnosis: "Auto mode",

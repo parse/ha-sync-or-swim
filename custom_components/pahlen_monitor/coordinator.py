@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import TypedDict
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
@@ -18,33 +17,11 @@ from .const import (
     DOMAIN,
     STATUS_UNKNOWN,
 )
-
-
-class UnitAnalysis(TypedDict):
-    """Analysis data for a single unit."""
-
-    status: str
-    diagnosis: str | None
-    pattern_detected: str | None
-    blinking_leds: list[str]
-    solid_leds: list[str]
-    summary: str
-    action_required: bool
-    recommended_action: str
-
-
-class PahlenData(TypedDict):
-    """The root data structure for the integration."""
-
-    installation_id: str | None
-    captured_at: str | None
-    pushed_at: str | None
-    chlorine: UnitAnalysis
-    ph: UnitAnalysis
-    stale: bool
-    raw_response: str | None
-    error: str | None
-
+from .contract_validation import (
+    PahlenData,
+    validate_analysis_result,
+    validate_latest_measurement,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -65,7 +42,7 @@ def compute_stale(captured_at_iso: str | None, threshold_minutes: int) -> bool:
 def unknown_data() -> PahlenData:
     """Return data for an unknown state."""
     return {
-        "installation_id": None,
+        "installation_id": "",
         "pushed_at": None,
         "raw_response": None,
         "chlorine": {
@@ -114,13 +91,18 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
     async def _async_update_data(self) -> PahlenData:
         try:
             _LOGGER.debug("Starting producer analysis")
-            result = await self._analyzer.analyze()
-            result["captured_at"] = datetime.now(tz=timezone.utc).isoformat()
-            result["stale"] = False
-            result["installation_id"] = self._installation_id
-            result["pushed_at"] = result["captured_at"]
-            result["raw_response"] = result.get("raw_response")
-            result["error"] = None
+            analysis = validate_analysis_result(await self._analyzer.analyze())
+            captured_at = datetime.now(tz=timezone.utc).isoformat()
+            result: PahlenData = {
+                "installation_id": self._installation_id,
+                "captured_at": captured_at,
+                "pushed_at": captured_at,
+                "chlorine": analysis["chlorine"],
+                "ph": analysis["ph"],
+                "stale": False,
+                "raw_response": analysis["raw_response"],
+                "error": None,
+            }
 
             _LOGGER.debug("Pushing results to backend: %s", self._backend_url)
             async with aiohttp.ClientSession() as session:
@@ -128,6 +110,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                     "captured_at": result["captured_at"],
                     "chlorine": result["chlorine"],
                     "ph": result["ph"],
+                    "raw_response": result["raw_response"],
                 }
                 token = self._entry.data.get(CONF_PUSH_TOKEN)
                 headers = {"Authorization": f"Bearer {token}"} if token else {}
@@ -140,8 +123,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                     if response.status not in (200, 201):
                         _LOGGER.error("Failed to push to backend: %s", response.status)
 
-            # Ensure we return PahlenData
-            return result  # type: ignore
+            return result
 
         except Exception as exc:
             _LOGGER.exception("Error in producer update")
@@ -179,11 +161,14 @@ class ConsumerCoordinator(DataUpdateCoordinator[PahlenData]):
                     if response.status != 200:
                         raise UpdateFailed(f"Backend returned status {response.status}")
 
-                    data: PahlenData = await response.json()
-                    data["stale"] = compute_stale(
-                        data.get("captured_at"), self._staleness_minutes
-                    )
-                    data["error"] = None
+                    remote_data = validate_latest_measurement(await response.json())
+                    data: PahlenData = {
+                        **remote_data,
+                        "stale": compute_stale(
+                            remote_data.get("captured_at"), self._staleness_minutes
+                        ),
+                        "error": None,
+                    }
                     return data
         except Exception as exc:
             _LOGGER.exception("Error polling backend")

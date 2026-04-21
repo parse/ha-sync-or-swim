@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "config_flow": true,
   "documentation": "https://github.com/parse/pahlen-monitor",
+  "issue_tracker": "https://github.com/parse/pahlen-monitor/issues",
   "requirements": ["openai>=1.0.0"],
   "dependencies": [],
   "codeowners": ["@parse"],
+  "integration_type": "service",
   "iot_class": "cloud_polling"
 }

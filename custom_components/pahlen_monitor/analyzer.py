@@ -18,6 +18,7 @@ from .const import (
     CONF_OPENAI_API_KEY,
     LIGHT_WARMUP_SECONDS,
 )
+from .contract_validation import AnalysisResult, validate_analysis_result
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class PahlenAnalyzer:
         self.entry_data = entry_data
         self.client = AsyncOpenAI(api_key=entry_data[CONF_OPENAI_API_KEY])
 
-    async def analyze(self) -> dict[str, Any]:
+    async def analyze(self) -> AnalysisResult:
         images = await self._capture_burst()
         result = await self._call_openai(images)
         return result
@@ -109,7 +110,7 @@ class PahlenAnalyzer:
                 "light", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: light_entity}, blocking=True
             )
 
-    async def _call_openai(self, images: list[bytes]) -> dict[str, Any]:
+    async def _call_openai(self, images: list[bytes]) -> AnalysisResult:
         content_list = [
             {
                 "type": "text",
@@ -146,9 +147,6 @@ class PahlenAnalyzer:
 
         _LOGGER.debug("OpenAI response: %s", content)
         data = json.loads(content)
+        data["raw_response"] = content
 
-        # Basic validation
-        if "chlorine" not in data or "ph" not in data:
-            raise RuntimeError("Invalid JSON response from OpenAI: missing units")
-
-        return data
+        return validate_analysis_result(data)

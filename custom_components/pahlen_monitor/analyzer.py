@@ -32,11 +32,11 @@ This means:
 - The device itself is still correctly oriented in reality.
 - Do NOT treat the image as mirrored — left/right directions are unchanged.
 
-Before analyzing, mentally rotate the image 180° so the device appears upright.
+Before analyzing, mentally rotate the image 180 degrees so the device appears upright.
 
 Then interpret LED positions, flashing patterns, and sequences based on the corrected orientation.
 
-The units have 7 LEDs each:
+The 2 units have 7 LEDs each:
 - LED 1 (Leftmost, Red): Critically Low
 - LED 2 (Yellow): Low
 - LED 3 (Yellow): Slightly Low
@@ -53,7 +53,41 @@ Behavior from Manual:
 - LEDs 1 & 7 (Red) Flashing (Short): Not Calibrated (Dosing disabled).
 - All Red/Yellow LEDs Flashing (LED 4 Green is OFF): Time-Out Error (Continuous dosing > 90 min - dosing disabled).
 
-Analyze the images carefully by comparing the burst to detect flashing. The chlorine unit is on the left and the pH unit on the right.
+ANALYZE USING BURST LOGIC (VERY IMPORTANT):
+You are given multiple images taken in sequence. You MUST compare them to determine true LED behavior over time.
+
+BURST CONSISTENCY RULE:
+- Determine LED states based on the MOST COMMON observation across all frames
+- Ignore single-frame anomalies or outliers
+- Do not infer blinking or state changes from one or two inconsistent frames
+
+BLINKING DETECTION RULE (CRITICAL):
+A LED is only considered blinking if ALL conditions are met:
+- The LED is clearly ON in some frames AND OFF in other frames within the burst
+- The ON/OFF change is consistent across at least 2 transitions
+- The pattern is clearly distinguishable from brightness variation or noise
+
+Do NOT classify a LED as blinking if:
+- It only shows slight brightness changes
+- It varies due to exposure, glare, or camera noise
+- Evidence is inconsistent across frames
+
+If uncertain → treat as SOLID.
+
+CHLORINE UNIT SAFETY RULE:
+Only classify chlorine as blinking or abnormal if there is strong multi-frame evidence.
+
+If chlorine LED behavior is uncertain:
+- Default status to "ok"
+- Avoid reporting errors or warnings unless clearly confirmed across multiple frames
+- Prefer false negatives over false positives for chlorine alerts
+
+ANALYZE EACH UNIT INDEPENDENTLY:
+- Chlorine and pH units must be analyzed separately
+- Do not transfer assumptions or motion patterns between them
+
+LOCATION CONTEXT:
+The chlorine unit is on the left (marked "Klordosering") and the pH unit is on the right (marked "Syradosering").
 
 Return the result as JSON:
 {

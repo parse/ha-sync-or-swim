@@ -1,6 +1,5 @@
 import logging
 
-import cv2
 import numpy as np
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,6 +45,8 @@ def get_led_color(led_idx):
 
 
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
+    import cv2
+
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     # Rotate 180 degrees
@@ -55,6 +56,8 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
 
 
 def analyze_burst(images_bytes: list[bytes], rois: dict = ROIS):
+    import cv2
+
     processed_images = [preprocess_image(img) for img in images_bytes]
 
     # Store results per frame per led
@@ -92,13 +95,13 @@ def analyze_burst(images_bytes: list[bytes], rois: dict = ROIS):
             transitions = np.sum(np.diff(on_frames.astype(int)) != 0)
             if transitions >= 2:
                 blink_leds.append(i + 1)
-        # Pahlen state machine logic
+
         on_count = sum(led_states)
         if 1 in blink_leds or 7 in blink_leds:
             status, diagnosis = "error", "Flow Error"
         elif led_states[0] or led_states[6]:  # Steady red
             status, diagnosis = "error", "Critically High/Low"
-        elif all(led_states) and on_count >= 5:  # Threshold for all LEDs
+        elif all(led_states) and on_count >= 5:
             status, diagnosis = "error", "Time-Out Error"
         elif any(led_states):
             status = "ok"

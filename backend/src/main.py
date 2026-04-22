@@ -11,10 +11,8 @@ app = FastAPI(title="Pahlen Monitor API", version="1.0.0")
 @app.on_event("startup")
 def save_openapi_json():
     openapi_data = app.openapi()
-    # Debug: Print the path being used
-    output_path = (
-        Path(__file__).resolve().parent.parent.parent / "backend" / "openapi.json"
-    )
+    # Save to /app/openapi.json, which is writable in the container
+    output_path = Path("/app/openapi.json")
     print(f"DEBUG: Saving OpenAPI to {output_path}")
     with open(output_path, "w") as f:
         json.dump(openapi_data, f, indent=2)

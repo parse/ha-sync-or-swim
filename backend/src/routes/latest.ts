@@ -13,6 +13,11 @@ const latestRoute = createRoute({
     params: z.object({
       installation_id: InstallationIdSchema,
     }),
+    headers: z.object({
+      authorization: z.string().openapi({
+        example: "Bearer your_read_token",
+      }),
+    }),
   },
   responses: {
     200: {
@@ -23,6 +28,9 @@ const latestRoute = createRoute({
       },
       description: "Latest measurement",
     },
+    401: {
+      description: "Unauthorized",
+    },
     404: {
       description: "No measurements found",
     },
@@ -31,6 +39,14 @@ const latestRoute = createRoute({
 
 app.openapi(latestRoute, async (c) => {
   const { installation_id: installationId } = c.req.valid("param");
+  const { authorization } = c.req.valid("header");
+
+  const expectedToken = process.env.READ_TOKEN;
+
+  const token = authorization.replace("Bearer ", "");
+  if (!expectedToken || token !== expectedToken) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
 
   const latest = await db.query.measurements.findFirst({
     where: eq(measurements.installationId, installationId),

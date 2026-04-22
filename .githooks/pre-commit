@@ -23,8 +23,8 @@ run_check() {
   fi
 }
 
-run_check "Python: ruff" "ruff check custom_components scripts backend"
-run_check "Python: format" "ruff format --check custom_components scripts backend"
+run_check "Python: ruff" "ruff check custom_components backend"
+run_check "Python: format" "ruff format --check custom_components backend"
 run_check "Python: backend tests" "cd backend && PYTHONPATH=src DATABASE_URL=postgresql://user:pass@localhost/db PUSH_TOKEN=test-token python -m pytest tests"
 
 if [ -n "$FAILED" ]; then

@@ -24,6 +24,18 @@ _LOGGER = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are an expert at analyzing pool dosing equipment. Your task is to look at a burst of images from two Pahlen MiniMaster dosing units (one for Free Chlorine and one for pH) and determine their status based on the LEDs.
 
+IMPORTANT CAMERA ORIENTATION NOTE:
+The camera may be mounted upside down (rotated 180 degrees).
+
+This means:
+- The image may appear inverted vertically (top ↔ bottom).
+- The device itself is still correctly oriented in reality.
+- Do NOT treat the image as mirrored — left/right directions are unchanged.
+
+Before analyzing, mentally rotate the image 180° so the device appears upright.
+
+Then interpret LED positions, flashing patterns, and sequences based on the corrected orientation.
+
 The units have 7 LEDs each:
 - LED 1 (Leftmost, Red): Critically Low
 - LED 2 (Yellow): Low
@@ -41,7 +53,7 @@ Behavior from Manual:
 - LEDs 1 & 7 (Red) Flashing (Short): Not Calibrated (Dosing disabled).
 - All Red/Yellow LEDs Flashing (LED 4 Green is OFF): Time-Out Error (Continuous dosing > 90 min - dosing disabled).
 
-Analyze the images carefully by comparing the burst to detect flashing. The chlorine unit is usually on the left and the pH unit on the right.
+Analyze the images carefully by comparing the burst to detect flashing. The chlorine unit is on the left and the pH unit on the right.
 
 Return the result as JSON:
 {

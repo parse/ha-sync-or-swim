@@ -10,6 +10,11 @@ const debugRoute = createRoute({
     params: z.object({
       installation_id: InstallationIdSchema,
     }),
+    headers: z.object({
+      authorization: z.string().openapi({
+        example: "Bearer your_debug_token",
+      }),
+    }),
   },
   responses: {
     200: {
@@ -22,11 +27,22 @@ const debugRoute = createRoute({
       },
       description: "Mock measurement data",
     },
+    401: {
+      description: "Unauthorized",
+    },
   },
 });
 
 app.openapi(debugRoute, (c) => {
   const { installation_id: installationId } = c.req.valid("param");
+  const { authorization } = c.req.valid("header");
+
+  const expectedToken = process.env.DEBUG_TOKEN;
+
+  const token = authorization.replace("Bearer ", "");
+  if (!expectedToken || token !== expectedToken) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
 
   return c.json({
     installation_id: installationId,

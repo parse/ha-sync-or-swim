@@ -8,6 +8,13 @@ const app = new OpenAPIHono();
 const installationsRoute = createRoute({
   method: "get",
   path: "/",
+  request: {
+    headers: z.object({
+      authorization: z.string().openapi({
+        example: "Bearer your_token",
+      }),
+    }),
+  },
   responses: {
     200: {
       content: {
@@ -22,10 +29,21 @@ const installationsRoute = createRoute({
       },
       description: "List of all installations",
     },
+    401: {
+      description: "Unauthorized",
+    },
   },
 });
 
 app.openapi(installationsRoute, async (c) => {
+  const { authorization } = c.req.valid("header");
+
+  const expectedToken = process.env.PUSH_TOKEN;
+
+  if (!expectedToken || authorization !== `Bearer ${expectedToken}`) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
   const allInstallations = await db.query.installations.findMany({
     orderBy: [desc(installations.lastSeen)],
   });

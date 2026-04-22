@@ -154,8 +154,13 @@ class ConsumerCoordinator(DataUpdateCoordinator[PahlenData]):
         try:
             _LOGGER.debug("Polling backend for latest data: %s", self._backend_url)
             async with aiohttp.ClientSession() as session:
+                token = self._entry.data.get(CONF_PUSH_TOKEN)
+                headers = {"Authorization": f"Bearer {token}"} if token else {}
+
                 async with session.get(
-                    f"{self._backend_url}/latest/{self._installation_id}", timeout=10
+                    f"{self._backend_url}/latest/{self._installation_id}",
+                    headers=headers,
+                    timeout=10,
                 ) as response:
                     if response.status == 404:
                         _LOGGER.info(

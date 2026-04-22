@@ -1,10 +1,41 @@
-from typing import Any, TypedDict, cast
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
-from .generated_api import VALID_STATUSES, LatestMeasurement, PushBody, UnitAnalysis
+# Re-defining the API contract manually now that generation scripts are removed.
+# This acts as the single source of truth for the Home Assistant plugin.
+
+Status = Literal["ok", "warning", "error", "unknown"]
+VALID_STATUSES = {"ok", "warning", "error", "unknown"}
+
+
+class UnitAnalysis(TypedDict):
+    status: Status
+    diagnosis: str | None
+    pattern_detected: str | None
+    blinking_leds: list[str]
+    solid_leds: list[str]
+    summary: str
+    action_required: bool
+    recommended_action: str
+
+
+class PushBody(TypedDict):
+    captured_at: str
+    chlorine: UnitAnalysis
+    ph: UnitAnalysis
+    raw_response: NotRequired[str | None]
+
+
+class LatestMeasurement(TypedDict):
+    installation_id: str
+    captured_at: str | None
+    pushed_at: str | None
+    chlorine: UnitAnalysis
+    ph: UnitAnalysis
+    raw_response: str | None
 
 
 class AnalysisResult(TypedDict):
-    """Result produced by the camera/OpenAI analysis step."""
+    """Result produced by the camera analysis step."""
 
     chlorine: UnitAnalysis
     ph: UnitAnalysis
@@ -62,7 +93,7 @@ def validate_unit_analysis(data: Any, field_name: str) -> UnitAnalysis:
 
 
 def validate_analysis_result(data: Any) -> AnalysisResult:
-    """Validate the OpenAI analysis result before it is pushed upstream."""
+    """Validate the analysis result before it is pushed upstream."""
 
     _require_type(data, dict, "analysis_result")
     chlorine = validate_unit_analysis(data.get("chlorine"), "chlorine")

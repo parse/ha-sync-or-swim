@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Pre-commit hook: runs linting and format check on staged files
+# Pre-commit hook: runs linting, formatting, and tests on backend
 # Minimal output - shows progress, details all failures at end
 
 TMPDIR_BASE=$(mktemp -d)
@@ -23,12 +23,9 @@ run_check() {
   fi
 }
 
-run_check "Backend: TypeScript" "(cd backend && npm run typecheck)"
-run_check "Backend: ESLint" "(cd backend && npm run lint)"
-run_check "Backend: Prettier" "(cd backend && npm run format:check)"
-run_check "Backend: Knip" "(cd backend && npm run knip)"
-run_check "HomeAssistant HACS Plugin: ruff" "ruff check custom_components scripts"
-run_check "HomeAssistant HACS Plugin: format" "ruff format --check custom_components scripts"
+run_check "Python: ruff" "ruff check custom_components backend"
+run_check "Python: format" "ruff format --check custom_components backend"
+run_check "Python: backend tests" "cd backend && PYTHONPATH=src DATABASE_URL=postgresql://user:pass@localhost/db PUSH_TOKEN=test-token python -m pytest tests"
 
 if [ -n "$FAILED" ]; then
   echo ""
@@ -41,12 +38,9 @@ if [ -n "$FAILED" ]; then
     echo "----------------------------------------"
 
     case "$name" in
-      "Backend: TypeScript") echo "Fix: Resolve type errors shown above" ;;
-      "Backend: ESLint") echo "Fix: npm run lint:fix from backend folder" ;;
-      "Backend: Prettier") echo "Fix: npm run format from backend folder" ;;
-      "Backend: Knip") echo "Fix: Remove unused dependencies/exports shown above from backend folder" ;;
-      "HomeAssistant HACS Plugin: ruff") echo "Fix: Fix ruff issues from custom_components folder" ;;
-      "HomeAssistant HACS Plugin: format") echo "Fix: Fix ruff format issues from custom_components folder" ;;
+      "Python: ruff") echo "Fix: Fix ruff issues" ;;
+      "Python: format") echo "Fix: Fix ruff format issues" ;;
+      "Python: backend tests") echo "Fix: Fix failing backend tests" ;;
     esac
     echo ""
   done

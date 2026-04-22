@@ -19,7 +19,6 @@ from .const import (
 )
 from .contract_validation import (
     PahlenData,
-    validate_analysis_result,
     validate_latest_measurement,
 )
 
@@ -90,8 +89,43 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
 
     async def _async_update_data(self) -> PahlenData:
         try:
-            _LOGGER.debug("Starting producer analysis")
-            analysis = validate_analysis_result(await self._analyzer.analyze())
+            _LOGGER.debug("Starting producer analysis via backend")
+
+            # 1. Capture Images (Placeholder/existing logic)
+            # You will need to implement the actual image capture here,
+            # likely using the logic previously in analyzer.py or cv_engine.py
+            images = []  # e.g., await self.hass.async_add_executor_job(capture_images)
+
+            # 2. Call the new FastAPI backend endpoint
+            async with aiohttp.ClientSession() as session:
+                token = self._entry.data.get(CONF_PUSH_TOKEN)
+                headers = {"Authorization": f"Bearer {token}"} if token else {}
+
+                # Prepare multipart/form-data for images
+                data = aiohttp.FormData()
+                for i, img_bytes in enumerate(images):
+                    data.add_field(
+                        "files",
+                        img_bytes,
+                        filename=f"frame_{i}.jpg",
+                        content_type="image/jpeg",
+                    )
+
+                async with session.post(
+                    f"{self._backend_url}/api/analyze/burst",
+                    data=data,
+                    headers=headers,
+                    timeout=60,
+                ) as response:
+                    if response.status != 200:
+                        response_body = await response.text()
+                        raise UpdateFailed(
+                            f"Backend analysis failed: {response.status} {response_body}"
+                        )
+
+                    analysis = await response.json()
+
+            # 3. Process results
             captured_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
             result: PahlenData = {
                 "installation_id": self._installation_id,
@@ -100,34 +134,11 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                 "chlorine": analysis["chlorine"],
                 "ph": analysis["ph"],
                 "stale": False,
-                "raw_response": analysis["raw_response"],
+                "raw_response": None,  # or json.dumps(analysis) if needed
                 "error": None,
             }
 
-            _LOGGER.debug("Pushing results to backend: %s", self._backend_url)
-            async with aiohttp.ClientSession() as session:
-                payload = {
-                    "captured_at": result["captured_at"],
-                    "chlorine": result["chlorine"],
-                    "ph": result["ph"],
-                    "raw_response": result["raw_response"],
-                }
-                token = self._entry.data.get(CONF_PUSH_TOKEN)
-                headers = {"Authorization": f"Bearer {token}"} if token else {}
-                async with session.post(
-                    f"{self._backend_url}/push/{self._installation_id}",
-                    json=payload,
-                    headers=headers,
-                    timeout=30,
-                ) as response:
-                    if response.status not in (200, 201):
-                        response_body = await response.text()
-                        _LOGGER.error(
-                            "Failed to push to backend: %s %s",
-                            response.status,
-                            response_body,
-                        )
-
+            _LOGGER.debug("Results received from backend and processed.")
             return result
 
         except Exception as exc:

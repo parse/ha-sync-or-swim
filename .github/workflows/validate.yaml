@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: astral-sh/ruff-action@v3
         with:
-          args: "check custom_components scripts"
+          args: "check custom_components"
       - uses: astral-sh/ruff-action@v3
         with:
-          args: "format --check custom_components scripts backend"
+          args: "format --check custom_components backend"

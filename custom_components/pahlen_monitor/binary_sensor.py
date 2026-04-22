@@ -44,6 +44,8 @@ class PahlenProblemSensor(CoordinatorEntity, BinarySensorEntity):
         return (
             chlorine_status in (STATUS_WARNING, STATUS_ERROR)
             or ph_status in (STATUS_WARNING, STATUS_ERROR)
+            or chlorine_status in (None, "unknown")
+            or ph_status in (None, "unknown")
             or data.get("stale", False)
         )
 

@@ -92,7 +92,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
         try:
             _LOGGER.debug("Starting producer analysis")
             analysis = validate_analysis_result(await self._analyzer.analyze())
-            captured_at = datetime.now(tz=timezone.utc).isoformat()
+            captured_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
             result: PahlenData = {
                 "installation_id": self._installation_id,
                 "captured_at": captured_at,

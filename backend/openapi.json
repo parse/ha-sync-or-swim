@@ -200,6 +200,15 @@
             "required": true,
             "name": "installation_id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "Bearer your_read_token"
+            },
+            "required": true,
+            "name": "authorization",
+            "in": "header"
           }
         ],
         "responses": {
@@ -212,6 +221,9 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
           },
           "404": {
             "description": "No measurements found"
@@ -231,6 +243,15 @@
             "required": true,
             "name": "installation_id",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "Bearer your_debug_token"
+            },
+            "required": true,
+            "name": "authorization",
+            "in": "header"
           }
         ],
         "responses": {
@@ -258,12 +279,26 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }
     },
     "/installations": {
       "get": {
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "Bearer your_token"
+            },
+            "required": true,
+            "name": "authorization",
+            "in": "header"
+          }
+        ],
         "responses": {
           "200": {
             "description": "List of all installations",
@@ -289,6 +324,9 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized"
           }
         }
       }

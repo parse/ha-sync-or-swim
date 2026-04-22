@@ -126,7 +126,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                 _LOGGER.debug("Capturing image %d/%d", i + 1, BURST_COUNT)
                 # Use HA's camera service to get image bytes
                 image_bytes = await camera.async_get_image(
-                    self.hass, entity_id=camera_entity_id, timeout=30
+                    self.hass, camera_entity_id, timeout=30
                 )
                 images.append(image_bytes)
 

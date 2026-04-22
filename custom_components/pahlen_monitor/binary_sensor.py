@@ -30,14 +30,20 @@ class PahlenProblemSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_unique_id = f"{entry.entry_id}_problem"
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
         data = self.coordinator.data
         if not data:
-            return False
+            return None
+
+        chlorine_status = data.get("chlorine", {}).get("status")
+        ph_status = data.get("ph", {}).get("status")
+
+        if chlorine_status in (None, "unknown") or ph_status in (None, "unknown"):
+            return None
 
         return (
-            data["chlorine"]["status"] in (STATUS_WARNING, STATUS_ERROR)
-            or data["ph"]["status"] in (STATUS_WARNING, STATUS_ERROR)
+            chlorine_status in (STATUS_WARNING, STATUS_ERROR)
+            or ph_status in (STATUS_WARNING, STATUS_ERROR)
             or data.get("stale", False)
         )
 

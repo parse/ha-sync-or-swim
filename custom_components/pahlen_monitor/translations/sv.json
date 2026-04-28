@@ -12,15 +12,10 @@
           "installation_id": "Installations-ID",
           "camera_entity": "Kameraentitet",
           "light_entity": "Spotlightsentitet (kamerans lampa)",
-          "openai_api_key": "OpenAI API-nyckel",
           "push_token": "Säkerhetstoken (Push Token)",
           "backend_url": "Backend-URL",
           "scan_interval": "Analysintervall (minuter)",
-          "image_detail": "AI-bilddetalj",
           "staleness_threshold": "Maximal dataålder (minuter)"
-        },
-        "data_description": {
-          "image_detail": "Styr hur mycket bilddetalj som skickas till OpenAI för varje bild. Högre detalj kan förbättra LED-detektering, men kan vara långsammare och kosta mer."
         }
       },
       "consumer": {
@@ -35,7 +30,6 @@
     },
     "error": {
       "cannot_connect": "Kan inte ansluta till backend",
-      "invalid_api_key": "Ogiltig OpenAI API-nyckel",
       "invalid_installation_id": "Använd bara små bokstäver, siffror och bindestreck för installations-ID",
       "invalid_entity": "Entitet hittades inte eller har fel typ",
       "unknown": "Oväntat fel"

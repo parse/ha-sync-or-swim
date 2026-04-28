@@ -1,1 +1,482 @@
-{"openapi": "3.1.0", "info": {"title": "Pahlen Monitor API", "version": "1.0.0"}, "paths": {"/push/{installation_id}": {"post": {"tags": ["push"], "summary": "Push Measurement", "operationId": "push_measurement_push__installation_id__post", "parameters": [{"name": "installation_id", "in": "path", "required": true, "schema": {"type": "string", "title": "Installation Id"}}, {"name": "authorization", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"}}], "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PushBodySchema"}}}}, "responses": {"201": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/latest/{installation_id}": {"get": {"tags": ["latest"], "summary": "Get Latest Measurement", "operationId": "get_latest_measurement_latest__installation_id__get", "parameters": [{"name": "installation_id", "in": "path", "required": true, "schema": {"type": "string", "title": "Installation Id"}}, {"name": "authorization", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LatestMeasurementSchema"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/debug/{installation_id}": {"get": {"tags": ["debug"], "summary": "Get Debug Measurement", "operationId": "get_debug_measurement_debug__installation_id__get", "parameters": [{"name": "installation_id", "in": "path", "required": true, "schema": {"type": "string", "title": "Installation Id"}}, {"name": "authorization", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/installations/": {"get": {"tags": ["installations"], "summary": "Get Installations", "operationId": "get_installations_installations__get", "parameters": [{"name": "authorization", "in": "header", "required": false, "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"}}], "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {"type": "array", "items": {"$ref": "#/components/schemas/InstallationResponseSchema"}, "title": "Response Get Installations Installations  Get"}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/api/analyze/burst": {"post": {"tags": ["analyze"], "summary": "Analyze Image Burst", "operationId": "analyze_image_burst_api_analyze_burst_post", "requestBody": {"content": {"multipart/form-data": {"schema": {"$ref": "#/components/schemas/Body_analyze_image_burst_api_analyze_burst_post"}}}, "required": true}, "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}, "422": {"description": "Validation Error", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}}}}}, "/health": {"get": {"summary": "Health Check", "operationId": "health_check_health_get", "responses": {"200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}}}}}, "components": {"schemas": {"Body_analyze_image_burst_api_analyze_burst_post": {"properties": {"files": {"items": {"type": "string", "contentMediaType": "application/octet-stream"}, "type": "array", "title": "Files"}}, "type": "object", "required": ["files"], "title": "Body_analyze_image_burst_api_analyze_burst_post"}, "HTTPValidationError": {"properties": {"detail": {"items": {"$ref": "#/components/schemas/ValidationError"}, "type": "array", "title": "Detail"}}, "type": "object", "title": "HTTPValidationError"}, "InstallationResponseSchema": {"properties": {"id": {"type": "string", "title": "Id"}, "last_seen": {"type": "string", "format": "date-time", "title": "Last Seen"}, "created_at": {"type": "string", "format": "date-time", "title": "Created At"}}, "type": "object", "required": ["id", "last_seen", "created_at"], "title": "InstallationResponseSchema"}, "LatestMeasurementSchema": {"properties": {"installation_id": {"type": "string", "title": "Installation Id"}, "captured_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Captured At"}, "pushed_at": {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}], "title": "Pushed At"}, "chlorine": {"$ref": "#/components/schemas/UnitAnalysis"}, "ph": {"$ref": "#/components/schemas/UnitAnalysis"}, "raw_response": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Raw Response"}}, "type": "object", "required": ["installation_id", "chlorine", "ph"], "title": "LatestMeasurementSchema"}, "PushBodySchema": {"properties": {"captured_at": {"type": "string", "format": "date-time", "title": "Captured At"}, "chlorine": {"$ref": "#/components/schemas/UnitAnalysis"}, "ph": {"$ref": "#/components/schemas/UnitAnalysis"}, "raw_response": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Raw Response"}}, "type": "object", "required": ["captured_at", "chlorine", "ph"], "title": "PushBodySchema"}, "UnitAnalysis": {"properties": {"status": {"type": "string", "title": "Status", "description": "ok | warning | error | unknown"}, "diagnosis": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Diagnosis"}, "pattern_detected": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Pattern Detected"}, "blinking_leds": {"items": {"type": "string"}, "type": "array", "title": "Blinking Leds", "default": []}, "solid_leds": {"items": {"type": "string"}, "type": "array", "title": "Solid Leds", "default": []}, "summary": {"type": "string", "title": "Summary"}, "action_required": {"type": "boolean", "title": "Action Required"}, "recommended_action": {"type": "string", "title": "Recommended Action"}}, "type": "object", "required": ["status", "summary", "action_required", "recommended_action"], "title": "UnitAnalysis"}, "ValidationError": {"properties": {"loc": {"items": {"anyOf": [{"type": "string"}, {"type": "integer"}]}, "type": "array", "title": "Location"}, "msg": {"type": "string", "title": "Message"}, "type": {"type": "string", "title": "Error Type"}, "input": {"title": "Input"}, "ctx": {"type": "object", "title": "Context"}}, "type": "object", "required": ["loc", "msg", "type"], "title": "ValidationError"}}}}
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Pahlen Monitor API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/latest/{installation_id}": {
+      "get": {
+        "tags": [
+          "latest"
+        ],
+        "summary": "Get Latest Measurement",
+        "operationId": "get_latest_measurement_latest__installation_id__get",
+        "parameters": [
+          {
+            "name": "installation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestMeasurementSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debug/{installation_id}": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Get Debug Measurement",
+        "operationId": "get_debug_measurement_debug__installation_id__get",
+        "parameters": [
+          {
+            "name": "installation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/installations/": {
+      "get": {
+        "tags": [
+          "installations"
+        ],
+        "summary": "Get Installations",
+        "operationId": "get_installations_installations__get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InstallationResponseSchema"
+                  },
+                  "title": "Response Get Installations Installations  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analyze/{installation_id}/burst": {
+      "post": {
+        "tags": [
+          "analyze"
+        ],
+        "summary": "Analyze And Store Image Burst",
+        "operationId": "analyze_and_store_image_burst_api_analyze__installation_id__burst_post",
+        "parameters": [
+          {
+            "name": "installation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Installation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_analyze_and_store_image_burst_api_analyze__installation_id__burst_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LatestMeasurementSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_analyze_and_store_image_burst_api_analyze__installation_id__burst_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_analyze_and_store_image_burst_api_analyze__installation_id__burst_post"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InstallationResponseSchema": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "last_seen": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "last_seen",
+          "created_at"
+        ],
+        "title": "InstallationResponseSchema"
+      },
+      "LatestMeasurementSchema": {
+        "properties": {
+          "installation_id": {
+            "type": "string",
+            "title": "Installation Id"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Captured At"
+          },
+          "pushed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pushed At"
+          },
+          "chlorine": {
+            "$ref": "#/components/schemas/UnitAnalysis"
+          },
+          "ph": {
+            "$ref": "#/components/schemas/UnitAnalysis"
+          },
+          "raw_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Response"
+          }
+        },
+        "type": "object",
+        "required": [
+          "installation_id",
+          "chlorine",
+          "ph"
+        ],
+        "title": "LatestMeasurementSchema"
+      },
+      "UnitAnalysis": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "ok | warning | error | unknown"
+          },
+          "diagnosis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diagnosis"
+          },
+          "pattern_detected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pattern Detected"
+          },
+          "blinking_leds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blinking Leds",
+            "default": []
+          },
+          "solid_leds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Solid Leds",
+            "default": []
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "action_required": {
+            "type": "boolean",
+            "title": "Action Required"
+          },
+          "recommended_action": {
+            "type": "string",
+            "title": "Recommended Action"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "summary",
+          "action_required",
+          "recommended_action"
+        ],
+        "title": "UnitAnalysis"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import analyze, debug, installations, latest, push
+from routes import analyze, debug, installations, latest
 
 app = FastAPI(title="Pahlen Monitor API", version="1.0.0")
 
@@ -26,7 +26,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(push.router, prefix="/push", tags=["push"])
 app.include_router(latest.router, prefix="/latest", tags=["latest"])
 app.include_router(debug.router, prefix="/debug", tags=["debug"])
 app.include_router(

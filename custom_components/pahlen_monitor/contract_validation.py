@@ -1,4 +1,4 @@
-from typing import Any, Literal, NotRequired, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 
 # Re-defining the API contract manually now that generation scripts are removed.
 # This acts as the single source of truth for the Home Assistant plugin.
@@ -18,25 +18,10 @@ class UnitAnalysis(TypedDict):
     recommended_action: str
 
 
-class PushBody(TypedDict):
-    captured_at: str
-    chlorine: UnitAnalysis
-    ph: UnitAnalysis
-    raw_response: NotRequired[str | None]
-
-
 class LatestMeasurement(TypedDict):
     installation_id: str
     captured_at: str | None
     pushed_at: str | None
-    chlorine: UnitAnalysis
-    ph: UnitAnalysis
-    raw_response: str | None
-
-
-class AnalysisResult(TypedDict):
-    """Result produced by the camera analysis step."""
-
     chlorine: UnitAnalysis
     ph: UnitAnalysis
     raw_response: str | None
@@ -90,37 +75,6 @@ def validate_unit_analysis(data: Any, field_name: str) -> UnitAnalysis:
         data.get("recommended_action"), str, f"{field_name}.recommended_action"
     )
     return cast(UnitAnalysis, data)
-
-
-def validate_analysis_result(data: Any) -> AnalysisResult:
-    """Validate the analysis result before it is pushed upstream."""
-
-    _require_type(data, dict, "analysis_result")
-    chlorine = validate_unit_analysis(data.get("chlorine"), "chlorine")
-    ph = validate_unit_analysis(data.get("ph"), "ph")
-    _require_nullable_string(data.get("raw_response"), "raw_response")
-    validated: AnalysisResult = {
-        "chlorine": chlorine,
-        "ph": ph,
-        "raw_response": data.get("raw_response"),
-    }
-    return validated
-
-
-def validate_push_body(data: Any) -> PushBody:
-    """Validate the payload sent from the producer to the hosted backend."""
-
-    _require_type(data, dict, "push_body")
-    _require_type(data.get("captured_at"), str, "captured_at")
-    _require_nullable_string(data.get("raw_response"), "raw_response")
-
-    validated: PushBody = {
-        "captured_at": cast(str, data["captured_at"]),
-        "chlorine": validate_unit_analysis(data.get("chlorine"), "chlorine"),
-        "ph": validate_unit_analysis(data.get("ph"), "ph"),
-        "raw_response": cast(str | None, data.get("raw_response")),
-    }
-    return validated
 
 
 def validate_latest_measurement(data: Any) -> LatestMeasurement:

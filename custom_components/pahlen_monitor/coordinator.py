@@ -155,7 +155,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                     )
 
                 async with session.post(
-                    f"{self._backend_url}/api/analyze/burst",
+                    f"{self._backend_url}/api/analyze/{self._installation_id}/burst",
                     data=data,
                     headers=headers,
                     timeout=60,
@@ -171,18 +171,12 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                             f"Backend analysis failed: {response.status}"
                         )
 
-                    analysis = await response.json()
+                    remote_data = validate_latest_measurement(await response.json())
 
             # 3. Process results from backend
-            captured_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
             result: PahlenData = {
-                "installation_id": self._installation_id,
-                "captured_at": captured_at,
-                "pushed_at": captured_at,
-                "chlorine": analysis["chlorine"],
-                "ph": analysis["ph"],
+                **remote_data,
                 "stale": False,
-                "raw_response": None,
                 "error": None,
             }
 

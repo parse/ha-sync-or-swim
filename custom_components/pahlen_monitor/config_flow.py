@@ -1,25 +1,20 @@
-import logging
 import re
 
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.helpers import selector
-from openai import AsyncOpenAI
 
 from .const import (
     CONF_BACKEND_URL,
     CONF_CAMERA_ENTITY,
-    CONF_IMAGE_DETAIL,
     CONF_INSTALLATION_ID,
     CONF_LIGHT_ENTITY,
-    CONF_OPENAI_API_KEY,
     CONF_POLL_INTERVAL,
     CONF_PUSH_TOKEN,
     CONF_ROLE,
     CONF_SCAN_INTERVAL,
     CONF_STALENESS_THRESHOLD,
-    DEFAULT_IMAGE_DETAIL,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_STALENESS_THRESHOLD,
@@ -29,7 +24,6 @@ from .const import (
     ROLE_PRODUCER,
 )
 
-_LOGGER = logging.getLogger(__name__)
 INSTALLATION_ID_REGEX = re.compile(INSTALLATION_ID_PATTERN)
 
 
@@ -75,12 +69,6 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not self.hass.states.get(user_input[CONF_LIGHT_ENTITY]):
                 errors[CONF_LIGHT_ENTITY] = "invalid_entity"
 
-            # Validate OpenAI API key
-            if not errors and not await self._test_openai_key(
-                user_input[CONF_OPENAI_API_KEY]
-            ):
-                errors[CONF_OPENAI_API_KEY] = "invalid_api_key"
-
             if not errors:
                 self._data.update(user_input)
                 return self.async_create_entry(title=installation_id, data=self._data)
@@ -96,15 +84,11 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_LIGHT_ENTITY): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="light")
                     ),
-                    vol.Required(CONF_OPENAI_API_KEY): str,
                     vol.Required(CONF_PUSH_TOKEN): str,
                     vol.Required(CONF_BACKEND_URL): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
                     ): int,
-                    vol.Optional(
-                        CONF_IMAGE_DETAIL, default=DEFAULT_IMAGE_DETAIL
-                    ): vol.In(["low", "high", "auto"]),
                     vol.Optional(
                         CONF_STALENESS_THRESHOLD, default=DEFAULT_STALENESS_THRESHOLD
                     ): int,
@@ -157,13 +141,5 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     f"{url.rstrip('/')}/health", timeout=10
                 ) as response:
                     return response.status == 200
-        except Exception:
-            return False
-
-    async def _test_openai_key(self, api_key):
-        try:
-            client = AsyncOpenAI(api_key=api_key)
-            await client.models.list()
-            return True
         except Exception:
             return False

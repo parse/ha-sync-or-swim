@@ -1,1 +1,3 @@
-pytest\nhttpx\npytest-asyncio
+pytest
+httpx
+pytest-asyncio

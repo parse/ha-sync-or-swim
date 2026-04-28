@@ -9,4 +9,4 @@ ignore = ["E501", "B008"]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["backend/src"]
-testpaths = ["backend/tests"]
+testpaths = ["backend/tests", "custom_components/tests"]

@@ -8,6 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .camera_payload import normalize_camera_payload
 from .const import (
     BURST_COUNT,
     BURST_INTERVAL_SECONDS,
@@ -125,10 +126,10 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
             for i in range(BURST_COUNT):
                 _LOGGER.debug("Capturing image %d/%d", i + 1, BURST_COUNT)
                 # Use HA's camera service to get image bytes
-                image_bytes = await camera.async_get_image(
+                image = await camera.async_get_image(
                     self.hass, camera_entity_id, timeout=30
                 )
-                images.append(image_bytes)
+                images.append(normalize_camera_payload(image))
 
                 if i < BURST_COUNT - 1:
                     await asyncio.sleep(BURST_INTERVAL_SECONDS)
@@ -146,12 +147,12 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
 
                 # Prepare multipart/form-data
                 data = aiohttp.FormData()
-                for i, img_bytes in enumerate(images):
+                for i, image in enumerate(images):
                     data.add_field(
                         "files",
-                        img_bytes,
+                        image.content,
                         filename=f"frame_{i}.jpg",
-                        content_type="image/jpeg",
+                        content_type=image.content_type,
                     )
 
                 async with session.post(

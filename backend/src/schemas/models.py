@@ -30,11 +30,6 @@ class InstallationResponseSchema(BaseModel):
     created_at: datetime
 
 
-class PushResponseSchema(BaseModel):
-    success: bool
-    message: str
-
-
 def validate_installation_id(v: str) -> str:
     if not re.match(r"^[a-z0-9-]{1,64}$", v):
         raise ValueError("Invalid installation ID")

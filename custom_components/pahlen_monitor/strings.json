@@ -12,15 +12,10 @@
           "installation_id": "Installation ID",
           "camera_entity": "Camera entity",
           "light_entity": "Spotlight entity",
-          "openai_api_key": "OpenAI API key",
           "push_token": "Push Token",
           "backend_url": "Backend URL",
           "scan_interval": "Scan interval (minutes)",
-          "image_detail": "AI image detail",
           "staleness_threshold": "Staleness threshold (minutes)"
-        },
-        "data_description": {
-          "image_detail": "Controls how much visual detail is sent to OpenAI for each image. Higher detail can improve LED detection, but may be slower and cost more."
         }
       },
       "consumer": {
@@ -35,7 +30,6 @@
     },
     "error": {
       "cannot_connect": "Cannot connect to backend",
-      "invalid_api_key": "Invalid OpenAI API key",
       "invalid_installation_id": "Use only lowercase letters, numbers, and hyphens for the installation ID",
       "invalid_entity": "Entity not found or wrong type",
       "unknown": "Unexpected error"

@@ -1,11 +1,11 @@
 # Pahlen Monitor
 
-Monitor your Pahlen pool dosing units using a camera and AI. This project uses Home Assistant, a Node.js backend, and OpenAI Vision to interpret the LED status on Pahlen MiniMaster units.
+Monitor your Pahlen pool dosing units using a camera and a Python backend. Home Assistant captures camera bursts, the FastAPI backend analyzes the LED status on Pahlen MiniMaster units, stores the reading, and exposes the latest status for sensors.
 
 ## Features
-- **Producer Role:** Captures images from a camera (e.g., Reolink CX410), analyzes them using GPT-4o, and pushes the results to a backend.
-- **Consumer Role:** Polls the shared backend for the latest status. Perfect for sharing status with neighbors.
-- **AI Analysis:** Recognizes LED patterns (steady, flashing) to determine dosing vs. measurement modes and error states.
+- **Producer Role:** Captures images from a camera (e.g., Reolink CX410) and sends one burst to the backend for analysis and storage.
+- **Consumer Role:** Polls the shared backend for the latest stored status. Perfect for sharing status with neighbors.
+- **Computer Vision Analysis:** Recognizes LED patterns to determine dosing vs. measurement modes and error states.
 - **Status Sensors:** Provides detailed sensors for Free Chlorine and pH status.
 - **Problem Detection:** Binary sensor for dosing problems and data staleness.
 
@@ -14,8 +14,7 @@ Monitor your Pahlen pool dosing units using a camera and AI. This project uses H
 - [HACS](https://hacs.xyz/) installed
 - Camera pointed at dosing units (tested with Reolink PoE cameras)
 - Spotlight/Light entity for night-time analysis
-- OpenAI API key
-- Backend server (Node.js/Hono)
+- Backend server (Python/FastAPI)
 
 ## Installation
 
@@ -24,13 +23,13 @@ Monitor your Pahlen pool dosing units using a camera and AI. This project uses H
 2. Install the "Pahlen Monitor" integration.
 3. Restart Home Assistant.
 
-## Contract
-- The backend OpenAPI contract is generated to `backend/openapi.json` with `npm run generate:openapi` from `backend/`.
-- Generate the Python types used by the Home Assistant integration with `python3 scripts/generate_python_contract.py`.
-- Run `python3 scripts/check_openapi_contract.py` from the repository root to verify `custom_components/pahlen_monitor/generated_api.py` is up to date with `backend/openapi.json`.
+## Backend Flow
+- Producers send camera bursts to `POST /api/analyze/{installation_id}/burst` with the configured bearer token.
+- The backend analyzes the images, stores the reading, and returns the same response shape used by `GET /latest/{installation_id}`.
+- Consumers continue polling `GET /latest/{installation_id}`.
 
 ### 2. Configuration
-- **Producer:** Add the integration and select "Producer". You'll need your OpenAI API key, camera entity, and backend URL.
+- **Producer:** Add the integration and select "Producer". You'll need your camera entity, spotlight entity, backend URL, push token, and installation ID.
 - **Consumer:** Add the integration and select "Consumer". You only need the backend URL and the same Installation ID as the producer.
 
 ## Entities

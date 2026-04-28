@@ -27,14 +27,6 @@ class LatestMeasurement(TypedDict):
     raw_response: str | None
 
 
-class AnalysisResult(TypedDict):
-    """Result produced by the camera analysis step."""
-
-    chlorine: UnitAnalysis
-    ph: UnitAnalysis
-    raw_response: str | None
-
-
 class PahlenData(LatestMeasurement):
     """Data structure used internally by the coordinator/entities."""
 
@@ -83,21 +75,6 @@ def validate_unit_analysis(data: Any, field_name: str) -> UnitAnalysis:
         data.get("recommended_action"), str, f"{field_name}.recommended_action"
     )
     return cast(UnitAnalysis, data)
-
-
-def validate_analysis_result(data: Any) -> AnalysisResult:
-    """Validate the analysis result before it is pushed upstream."""
-
-    _require_type(data, dict, "analysis_result")
-    chlorine = validate_unit_analysis(data.get("chlorine"), "chlorine")
-    ph = validate_unit_analysis(data.get("ph"), "ph")
-    _require_nullable_string(data.get("raw_response"), "raw_response")
-    validated: AnalysisResult = {
-        "chlorine": chlorine,
-        "ph": ph,
-        "raw_response": data.get("raw_response"),
-    }
-    return validated
 
 
 def validate_latest_measurement(data: Any) -> LatestMeasurement:

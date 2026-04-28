@@ -27,6 +27,6 @@ primary_region = 'arn'
     handlers = ['tls', 'http']
 
 [[vm]]
-  memory = '256mb'
+  memory = '768mb'
   cpus = 1
-  memory_mb = 256
+  memory_mb = 768

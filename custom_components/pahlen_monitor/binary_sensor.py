@@ -23,7 +23,7 @@ async def async_setup_entry(
 
 class PahlenProblemSensor(CoordinatorEntity, BinarySensorEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
-    _attr_name = "Dosing Problem"
+    _attr_name = "Pahlen Dosing Problem"
 
     def __init__(self, coordinator, entry):
         super().__init__(coordinator)

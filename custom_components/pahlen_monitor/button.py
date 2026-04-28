@@ -22,7 +22,7 @@ async def async_setup_entry(
 
 
 class PahlenAnalyzeButton(CoordinatorEntity, ButtonEntity):
-    _attr_name = "Analyze Now"
+    _attr_name = "Pahlen Analyze Now"
     _attr_icon = "mdi:camera-refresh"
 
     def __init__(self, coordinator, entry):

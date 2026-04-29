@@ -1,13 +1,13 @@
 {
   "domain": "pahlen_monitor",
   "name": "Pahlen Monitor",
-  "version": "1.0.0",
+  "codeowners": ["@parse"],
   "config_flow": true,
+  "dependencies": [],
   "documentation": "https://github.com/parse/pahlen-monitor",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/parse/pahlen-monitor/issues",
   "requirements": [],
-  "dependencies": [],
-  "codeowners": ["@parse"],
-  "integration_type": "service",
-  "iot_class": "cloud_polling"
+  "version": "1.0.0"
 }

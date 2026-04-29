@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from auth import verify_token
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,7 +11,9 @@ router = APIRouter()
 
 
 @router.get("/{installation_id}")
-async def get_debug_measurement(installation_id: str, _=Depends(verify_token)):
+async def get_debug_measurement(
+    installation_id: str, _auth: None = Depends(verify_token)
+) -> dict[str, Any]:
     try:
         validate_installation_id(installation_id)
     except ValueError as e:

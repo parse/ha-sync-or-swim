@@ -1,15 +1,36 @@
 import re
 from datetime import datetime
+from typing import Literal, TypedDict
 
 from pydantic import BaseModel, Field
 
+StatusLiteral = Literal["ok", "warning", "error", "unknown"]
+ModeLiteral = Literal["auto", "standby", "dosing", "error", "unknown", "disabled"]
+
+
+class CVBaseUnitResult(TypedDict):
+    level: int | None
+    mode: ModeLiteral
+    status: StatusLiteral
+    diagnosis: str
+
+
+class CVUnitAnalysisPayload(CVBaseUnitResult):
+    led_states: list[bool]
+    blinking: list[int]
+
+
+class CVAnalysisResult(TypedDict):
+    chlorine: CVUnitAnalysisPayload
+    ph: CVUnitAnalysisPayload
+
 
 class UnitAnalysis(BaseModel):
-    status: str = Field(..., description="ok | warning | error | unknown")
+    status: StatusLiteral = Field(..., description="ok | warning | error | unknown")
     diagnosis: str | None = None
     pattern_detected: str | None = None
-    blinking_leds: list[str] = []
-    solid_leds: list[str] = []
+    blinking_leds: list[str] = Field(default_factory=list)
+    solid_leds: list[str] = Field(default_factory=list)
     summary: str
     action_required: bool
     recommended_action: str
@@ -26,8 +47,8 @@ class LatestMeasurementSchema(BaseModel):
 
 class InstallationResponseSchema(BaseModel):
     id: str
-    last_seen: datetime
-    created_at: datetime
+    last_seen: datetime | None
+    created_at: datetime | None
 
 
 def validate_installation_id(v: str) -> str:

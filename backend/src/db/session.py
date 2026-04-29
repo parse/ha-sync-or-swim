@@ -1,7 +1,9 @@
 import os
+from collections.abc import Iterator
+from typing import Any
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -13,7 +15,7 @@ if not DATABASE_URL:
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-engine_kwargs = {}
+engine_kwargs: dict[str, Any] = {}
 if DATABASE_URL == "sqlite+pysqlite:///:memory:":
     engine_kwargs = {
         "connect_args": {"check_same_thread": False},
@@ -24,7 +26,7 @@ engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db():
+def get_db() -> Iterator[Session]:
     db = SessionLocal()
     try:
         yield db

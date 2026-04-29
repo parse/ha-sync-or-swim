@@ -1,21 +1,8 @@
-import json
-from pathlib import Path
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import analyze, debug, installations, latest
 
 app = FastAPI(title="Pahlen Monitor API", version="1.0.0")
-
-
-@app.on_event("startup")
-def save_openapi_json():
-    openapi_data = app.openapi()
-    # Save to /app/openapi.json, which is writable in the container
-    output_path = Path("/app/openapi.json")
-    print(f"DEBUG: Saving OpenAPI to {output_path}")
-    with open(output_path, "w") as f:
-        json.dump(openapi_data, f, indent=2)
 
 
 app.add_middleware(
@@ -35,7 +22,7 @@ app.include_router(analyze.router, prefix="/api/analyze", tags=["analyze"])
 
 
 @app.get("/health")
-async def health_check():
+async def health_check() -> dict[str, bool]:
     return {"ok": True}
 
 

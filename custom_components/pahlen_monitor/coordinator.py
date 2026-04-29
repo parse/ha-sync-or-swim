@@ -1,26 +1,19 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
-import aiohttp
 from homeassistant.components import camera
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from .api_client import PahlenApiClient, PahlenApiNotFound
 from .camera_payload import normalize_camera_payload
 from .const import (
     BURST_COUNT,
     BURST_INTERVAL_SECONDS,
-    CONF_BACKEND_URL,
-    CONF_CAMERA_ENTITY,
     CONF_INSTALLATION_ENABLED,
-    CONF_INSTALLATION_ID,
-    CONF_LIGHT_ENTITY,
-    CONF_POLL_INTERVAL,
-    CONF_PUSH_TOKEN,
-    CONF_SCAN_INTERVAL,
-    CONF_STALENESS_THRESHOLD,
     DEFAULT_INSTALLATION_ENABLED,
     DOMAIN,
     LIGHT_WARMUP_SECONDS,
@@ -29,8 +22,9 @@ from .const import (
 )
 from .contract_validation import (
     PahlenData,
-    validate_latest_measurement,
+    UnitAnalysis,
 )
+from .entry_types import PahlenConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,7 +76,7 @@ def unknown_data() -> PahlenData:
 
 def disabled_data(installation_id: str = "") -> PahlenData:
     """Return data for a seasonally disabled installation."""
-    unit = {
+    unit: UnitAnalysis = {
         "status": STATUS_OK,
         "diagnosis": "Installation disabled",
         "pattern_detected": "disabled",
@@ -108,30 +102,28 @@ def disabled_data(installation_id: str = "") -> PahlenData:
 class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
     """Data coordinator for the producer role."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
-        interval_minutes = entry.data[
-            CONF_SCAN_INTERVAL
-        ]  # Assuming SCAN_INTERVAL is for producer
+    def __init__(self, hass: HomeAssistant, entry: PahlenConfigEntry):
+        entry_data = entry.data
+        interval_minutes = entry_data["scan_interval"]
         super().__init__(
             hass,
             logger=_LOGGER,
-            name=f"{DOMAIN}_producer_{entry.data[CONF_INSTALLATION_ID]}",
+            name=f"{DOMAIN}_producer_{entry_data['installation_id']}",
             update_interval=timedelta(minutes=interval_minutes),
         )
         self._entry = entry
-        self._backend_url = entry.data[CONF_BACKEND_URL].rstrip("/")
-        self._installation_id = entry.data[CONF_INSTALLATION_ID]
-        self._staleness_minutes = entry.data[CONF_STALENESS_THRESHOLD]
+        self._entry_data = entry_data
+        self._installation_id = entry_data["installation_id"]
+        self._staleness_minutes = entry_data["staleness_threshold"]
+        self._api_client = PahlenApiClient(
+            entry_data["backend_url"], entry_data.get("push_token")
+        )
 
     @property
     def installation_enabled(self) -> bool:
         return self._entry.options.get(
-            CONF_INSTALLATION_ENABLED, DEFAULT_INSTALLATION_ENABLED
+            "installation_enabled", DEFAULT_INSTALLATION_ENABLED
         )
-
-    def _auth_headers(self) -> dict[str, str]:
-        token = self._entry.data.get(CONF_PUSH_TOKEN)
-        return {"Authorization": f"Bearer {token}"} if token else {}
 
     async def _async_update_data(self) -> PahlenData:
         try:
@@ -142,10 +134,8 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
             _LOGGER.debug("Starting producer analysis via backend")
 
             # 1. Capture Images (Burst)
-            camera_entity_id = self._entry.data.get(CONF_CAMERA_ENTITY)
-            light_entity_id = self._entry.data.get(
-                CONF_LIGHT_ENTITY
-            )  # Assuming light entity is configured
+            camera_entity_id = self._entry_data.get("camera_entity")
+            light_entity_id = self._entry_data.get("light_entity")
 
             if not camera_entity_id:
                 _LOGGER.error(
@@ -182,36 +172,10 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
             ):  # Check if capture returned an empty list or empty bytes
                 raise UpdateFailed("No image data captured from camera.")
 
-            # 2. Call the new FastAPI backend endpoint for analysis
-            async with aiohttp.ClientSession() as session:
-                # Prepare multipart/form-data
-                data = aiohttp.FormData()
-                for i, image in enumerate(images):
-                    data.add_field(
-                        "files",
-                        image.content,
-                        filename=f"frame_{i}.jpg",
-                        content_type=image.content_type,
-                    )
-
-                async with session.post(
-                    f"{self._backend_url}/api/analyze/{self._installation_id}/burst",
-                    data=data,
-                    headers=self._auth_headers(),
-                    timeout=60,
-                ) as response:
-                    response_body = await response.text()
-                    if response.status != 200:
-                        _LOGGER.error(
-                            "Backend analysis failed: %s %s",
-                            response.status,
-                            response_body,
-                        )
-                        raise UpdateFailed(
-                            f"Backend analysis failed: {response.status}"
-                        )
-
-                    remote_data = validate_latest_measurement(await response.json())
+            # 2. Call the FastAPI backend endpoint for analysis.
+            remote_data = await self._api_client.analyze_burst(
+                self._installation_id, images
+            )
 
             # 3. Process results from backend
             result: PahlenData = {
@@ -235,25 +199,16 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
     async def _async_fetch_latest_data(self) -> PahlenData:
         try:
             _LOGGER.debug("Fetching latest backend data for producer")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"{self._backend_url}/latest/{self._installation_id}",
-                    headers=self._auth_headers(),
-                    timeout=10,
-                ) as response:
-                    if response.status == 404:
-                        return unknown_data()
-                    if response.status != 200:
-                        raise UpdateFailed(f"Backend returned status {response.status}")
-
-                    remote_data = validate_latest_measurement(await response.json())
-                    return {
-                        **remote_data,
-                        "stale": compute_stale(
-                            remote_data.get("captured_at"), self._staleness_minutes
-                        ),
-                        "error": None,
-                    }
+            remote_data = await self._api_client.get_latest(self._installation_id)
+            return {
+                **remote_data,
+                "stale": compute_stale(
+                    remote_data.get("captured_at"), self._staleness_minutes
+                ),
+                "error": None,
+            }
+        except PahlenApiNotFound:
+            return unknown_data()
         except Exception as exc:
             _LOGGER.exception("Error fetching latest backend data")
             if isinstance(exc, UpdateFailed):
@@ -275,22 +230,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
 
     async def _async_store_disabled_state(self) -> None:
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self._backend_url}/installations/{self._installation_id}/disabled",
-                    headers=self._auth_headers(),
-                    timeout=10,
-                ) as response:
-                    response_body = await response.text()
-                    if response.status != 200:
-                        _LOGGER.error(
-                            "Backend disabled-state update failed: %s %s",
-                            response.status,
-                            response_body,
-                        )
-                        raise UpdateFailed(
-                            f"Backend disabled-state update failed: {response.status}"
-                        )
+            await self._api_client.store_disabled_state(self._installation_id)
         except Exception as exc:
             _LOGGER.exception("Error storing disabled state")
             if isinstance(exc, UpdateFailed):
@@ -301,51 +241,43 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
 class ConsumerCoordinator(DataUpdateCoordinator[PahlenData]):
     """Data coordinator for the consumer role."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry):
-        interval_minutes = entry.data[CONF_POLL_INTERVAL]
+    def __init__(self, hass: HomeAssistant, entry: PahlenConfigEntry):
+        entry_data = entry.data
+        interval_minutes = entry_data["poll_interval"]
         super().__init__(
             hass,
             logger=_LOGGER,
-            name=f"{DOMAIN}_consumer_{entry.data[CONF_INSTALLATION_ID]}",
+            name=f"{DOMAIN}_consumer_{entry_data['installation_id']}",
             update_interval=timedelta(minutes=interval_minutes),
         )
         self._entry = entry
-        self._backend_url = entry.data[CONF_BACKEND_URL].rstrip("/")
-        self._installation_id = entry.data[CONF_INSTALLATION_ID]
-        self._staleness_minutes = entry.data[CONF_STALENESS_THRESHOLD]
+        self._entry_data = entry_data
+        self._installation_id = entry_data["installation_id"]
+        self._staleness_minutes = entry_data["staleness_threshold"]
+        self._api_client = PahlenApiClient(
+            entry_data["backend_url"], entry_data.get("push_token")
+        )
 
     async def _async_update_data(self) -> PahlenData:
         try:
-            _LOGGER.debug("Polling backend for latest data: %s", self._backend_url)
-            async with aiohttp.ClientSession() as session:
-                token = self._entry.data.get(CONF_PUSH_TOKEN)
-                headers = {"Authorization": f"Bearer {token}"} if token else {}
-
-                async with session.get(
-                    f"{self._backend_url}/latest/{self._installation_id}",
-                    headers=headers,
-                    timeout=10,
-                ) as response:
-                    if response.status == 404:
-                        _LOGGER.info(
-                            "No data found for installation %s", self._installation_id
-                        )
-                        return unknown_data()
-
-                    if response.status != 200:
-                        raise UpdateFailed(f"Backend returned status {response.status}")
-
-                    remote_data = validate_latest_measurement(await response.json())
-                    data: PahlenData = {
-                        **remote_data,
-                        "stale": compute_stale(
-                            remote_data.get("captured_at"), self._staleness_minutes
-                        ),
-                        "error": None,
-                    }
-                    return data
+            _LOGGER.debug("Polling backend for latest data")
+            remote_data = await self._api_client.get_latest(self._installation_id)
+            data: PahlenData = {
+                **remote_data,
+                "stale": compute_stale(
+                    remote_data.get("captured_at"), self._staleness_minutes
+                ),
+                "error": None,
+            }
+            return data
+        except PahlenApiNotFound:
+            _LOGGER.info("No data found for installation %s", self._installation_id)
+            return unknown_data()
         except Exception as exc:
             _LOGGER.exception("Error polling backend")
             if isinstance(exc, UpdateFailed):
                 raise
             raise UpdateFailed(f"Failed to fetch data: {exc}") from exc
+
+
+PahlenCoordinator = ProducerCoordinator | ConsumerCoordinator

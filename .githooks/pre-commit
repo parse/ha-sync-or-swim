@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Pre-commit hook: runs linting, formatting, and tests on backend
+# Pre-commit hook: mirrors local Python checks run by CI
 # Minimal output - shows progress, details all failures at end
 
 TMPDIR_BASE=$(mktemp -d)
@@ -23,9 +23,11 @@ run_check() {
   fi
 }
 
-run_check "Python: ruff" "ruff check custom_components backend"
-run_check "Python: format" "ruff format --check custom_components backend"
-run_check "Python: backend tests" "PYTHONPATH=backend/src DATABASE_URL=sqlite+pysqlite:///:memory: PUSH_TOKEN=test-token python -m pytest backend/tests"
+run_check "Python: ruff" "python -m ruff check custom_components backend scripts"
+run_check "Python: format" "python -m ruff format --check custom_components backend scripts"
+run_check "Python: mypy" "python -m mypy backend/src custom_components/pahlen_monitor"
+run_check "Python: api types" "python scripts/generate_api_types.py --check"
+run_check "Python: tests" "PYTHONPATH=backend/src DATABASE_URL=sqlite+pysqlite:///:memory: PUSH_TOKEN=test-token python -m pytest"
 
 if [ -n "$FAILED" ]; then
   echo ""
@@ -40,7 +42,9 @@ if [ -n "$FAILED" ]; then
     case "$name" in
       "Python: ruff") echo "Fix: Fix ruff issues" ;;
       "Python: format") echo "Fix: Fix ruff format issues" ;;
-      "Python: backend tests") echo "Fix: Fix failing backend tests" ;;
+      "Python: mypy") echo "Fix: Fix type errors" ;;
+      "Python: api types") echo "Fix: Regenerate API types with scripts/generate_api_types.py" ;;
+      "Python: tests") echo "Fix: Fix failing tests" ;;
     esac
     echo ""
   done

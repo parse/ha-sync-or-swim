@@ -16,6 +16,18 @@ Monitor your Pahlen pool dosing units using a camera and a Python backend. Home 
 - Spotlight/Light entity for night-time analysis
 - Backend server (Python/FastAPI)
 
+## Quality Gates
+The repository's validation workflow runs:
+- `ruff check custom_components backend scripts`
+- `ruff format --check custom_components backend scripts`
+- `mypy backend/src custom_components/pahlen_monitor`
+- `python scripts/generate_api_types.py --check`
+- `pytest`
+- HACS validation
+- hassfest validation
+
+For local checks, install `backend/requirements-dev.txt` alongside the backend requirements.
+
 ## Installation
 
 ### 1. Install Integration

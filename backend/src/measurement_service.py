@@ -1,8 +1,14 @@
 from datetime import datetime, timezone
-from typing import Any
+from typing import cast
 
 from db.models import Installation, Measurement
-from schemas.models import LatestMeasurementSchema, UnitAnalysis
+from schemas.models import (
+    CVAnalysisResult,
+    CVUnitAnalysisPayload,
+    LatestMeasurementSchema,
+    StatusLiteral,
+    UnitAnalysis,
+)
 from sqlalchemy.orm import Session
 
 
@@ -10,13 +16,19 @@ def led_labels(leds: list[int]) -> list[str]:
     return [f"LED {led}" for led in leds]
 
 
-def unit_from_cv(data: dict[str, Any]) -> UnitAnalysis:
-    status = data.get("status", "unknown")
-    diagnosis = data.get("diagnosis")
-    mode = data.get("mode")
-    level = data.get("level")
-    blinking = data.get("blinking", [])
-    led_states = data.get("led_states", [])
+def status_from_db(value: str) -> StatusLiteral:
+    if value in {"ok", "warning", "error", "unknown"}:
+        return cast(StatusLiteral, value)
+    return "unknown"
+
+
+def unit_from_cv(data: CVUnitAnalysisPayload) -> UnitAnalysis:
+    status = data["status"]
+    diagnosis = data["diagnosis"]
+    mode = data["mode"]
+    level = data["level"]
+    blinking = data["blinking"]
+    led_states = data["led_states"]
     solid_leds = [idx + 1 for idx, is_on in enumerate(led_states) if is_on]
 
     if diagnosis:
@@ -46,7 +58,7 @@ def latest_schema_from_measurement(measurement: Measurement) -> LatestMeasuremen
         captured_at=measurement.captured_at,
         pushed_at=measurement.pushed_at,
         chlorine=UnitAnalysis(
-            status=measurement.chlorine_status,
+            status=status_from_db(measurement.chlorine_status),
             diagnosis=measurement.chlorine_diagnosis,
             pattern_detected=measurement.chlorine_pattern,
             blinking_leds=measurement.chlorine_blinking or [],
@@ -56,7 +68,7 @@ def latest_schema_from_measurement(measurement: Measurement) -> LatestMeasuremen
             recommended_action=measurement.chlorine_recommended or "",
         ),
         ph=UnitAnalysis(
-            status=measurement.ph_status,
+            status=status_from_db(measurement.ph_status),
             diagnosis=measurement.ph_diagnosis,
             pattern_detected=measurement.ph_pattern,
             blinking_leds=measurement.ph_blinking or [],
@@ -72,7 +84,7 @@ def latest_schema_from_measurement(measurement: Measurement) -> LatestMeasuremen
 def store_cv_result(
     db: Session,
     installation_id: str,
-    cv_result: dict[str, Any],
+    cv_result: CVAnalysisResult,
     captured_at: datetime | None = None,
 ) -> LatestMeasurementSchema:
     captured_at = captured_at or datetime.now(timezone.utc)
@@ -85,8 +97,8 @@ def store_cv_result(
     else:
         installation.last_seen = now
 
-    chlorine = unit_from_cv(cv_result.get("chlorine", {}))
-    ph = unit_from_cv(cv_result.get("ph", {}))
+    chlorine = unit_from_cv(cv_result["chlorine"])
+    ph = unit_from_cv(cv_result["ph"])
 
     measurement = Measurement(
         installation_id=installation_id,

@@ -1,3 +1,5 @@
+from typing import Final, Literal
+
 DOMAIN = "pahlen_monitor"
 INSTALLATION_ID_PATTERN = r"^[a-z0-9-]{1,64}$"
 
@@ -27,10 +29,10 @@ BURST_COUNT = 8
 BURST_INTERVAL_SECONDS = 0.4
 
 # Status values
-STATUS_OK = "ok"
-STATUS_WARNING = "warning"
-STATUS_ERROR = "error"
-STATUS_UNKNOWN = "unknown"
+STATUS_OK: Final[Literal["ok"]] = "ok"
+STATUS_WARNING: Final[Literal["warning"]] = "warning"
+STATUS_ERROR: Final[Literal["error"]] = "error"
+STATUS_UNKNOWN: Final[Literal["unknown"]] = "unknown"
 
 # Platforms
 PLATFORMS = ["sensor", "binary_sensor", "button", "switch"]

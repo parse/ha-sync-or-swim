@@ -14,8 +14,8 @@ async def analyze_and_store_image_burst(
     installation_id: str,
     files: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
-    _=Depends(verify_token),
-):
+    _auth: None = Depends(verify_token),
+) -> LatestMeasurementSchema:
     try:
         validate_installation_id(installation_id)
     except ValueError as e:
@@ -25,7 +25,7 @@ async def analyze_and_store_image_burst(
         raise HTTPException(status_code=400, detail="No files provided")
 
     try:
-        images_bytes = []
+        images_bytes: list[bytes] = []
         for file in files:
             content = await file.read()
             images_bytes.append(content)

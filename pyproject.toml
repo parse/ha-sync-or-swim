@@ -5,6 +5,29 @@ line-length = 88
 select = ["E", "W", "F", "I", "UP", "B", "C4"]
 ignore = ["E501", "B008"]
 
+[tool.mypy]
+files = ["backend/src", "custom_components/pahlen_monitor"]
+namespace_packages = true
+explicit_package_bases = true
+pretty = true
+show_error_codes = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_reexport = true
+strict = true
+disallow_subclassing_any = false
+mypy_path = ["backend/src", "."]
+
+[[tool.mypy.overrides]]
+module = ["aiohttp", "homeassistant", "homeassistant.*", "voluptuous", "cv2"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["custom_components.pahlen_monitor.config_flow"]
+disable_error_code = ["call-arg"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"

@@ -15,7 +15,9 @@ router = APIRouter()
 
 
 @router.get("/", response_model=list[InstallationResponseSchema])
-async def get_installations(db: Session = Depends(get_db), _=Depends(verify_token)):
+async def get_installations(
+    db: Session = Depends(get_db), _auth: None = Depends(verify_token)
+) -> list[InstallationResponseSchema]:
     all_installations = (
         db.query(Installation).order_by(desc(Installation.last_seen)).all()
     )
@@ -30,8 +32,10 @@ async def get_installations(db: Session = Depends(get_db), _=Depends(verify_toke
 
 @router.post("/{installation_id}/disabled", response_model=LatestMeasurementSchema)
 async def disable_installation(
-    installation_id: str, db: Session = Depends(get_db), _=Depends(verify_token)
-):
+    installation_id: str,
+    db: Session = Depends(get_db),
+    _auth: None = Depends(verify_token),
+) -> LatestMeasurementSchema:
     try:
         validate_installation_id(installation_id)
     except ValueError as e:

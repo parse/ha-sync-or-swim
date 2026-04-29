@@ -1,8 +1,12 @@
 import logging
+from typing import Literal
 
 import numpy as np
+from schemas.models import CVAnalysisResult, CVBaseUnitResult, StatusLiteral
 
 _LOGGER = logging.getLogger(__name__)
+DeviceName = Literal["chlorine", "ph"]
+RoiMap = dict[DeviceName, list[list[int]]]
 
 CROP_X = 3500
 CROP_Y = 800
@@ -10,7 +14,7 @@ CROP_WIDTH = 1300
 CROP_HEIGHT = 500
 
 # Calibrated ROIs based on actual LED spots (x, y, w, h)
-ROIS = {
+ROIS: RoiMap = {
     "chlorine": [
         [540, 245, 12, 12],
         [558, 245, 12, 12],
@@ -38,11 +42,11 @@ COLOR_MASKS = {
     "GREEN": [((40, 100, 100), (85, 255, 255))],
 }
 
-SHIFTED_ROIS = {
+SHIFTED_ROIS: RoiMap = {
     device: [[x + 50, y, w, h] for x, y, w, h in rois] for device, rois in ROIS.items()
 }
 
-PRIVACY_MASK_ROIS = {
+PRIVACY_MASK_ROIS: RoiMap = {
     "chlorine": [
         [579, 227, 14, 14],
         [600, 227, 14, 14],
@@ -64,7 +68,7 @@ PRIVACY_MASK_ROIS = {
 }
 
 
-def get_led_color(idx: int) -> str:
+def get_led_color(idx: int) -> Literal["RED", "YELLOW", "GREEN"]:
     if idx in [0, 6]:
         return "RED"
     if idx == 3:
@@ -77,22 +81,26 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
 
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Could not decode image bytes")
 
     img = cv2.rotate(img, cv2.ROTATE_180)
     return img[CROP_Y : CROP_Y + CROP_HEIGHT, CROP_X : CROP_X + CROP_WIDTH]
 
 
-def derive_level(led_states):
+def derive_level(led_states: list[bool]) -> int | None:
     for i, state in enumerate(led_states):
         if state:
             return i + 1
     return None
 
 
-def detect_led_on_frames(processed_images, rois: dict):
+def detect_led_on_frames(
+    processed_images: list[np.ndarray], rois: RoiMap
+) -> dict[DeviceName, list[list[bool]]]:
     import cv2
 
-    led_on_frames = {
+    led_on_frames: dict[DeviceName, list[list[bool]]] = {
         "chlorine": [[] for _ in range(7)],
         "ph": [[] for _ in range(7)],
     }
@@ -100,7 +108,7 @@ def detect_led_on_frames(processed_images, rois: dict):
     for img in processed_images:
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-        for device in ["chlorine", "ph"]:
+        for device in ("chlorine", "ph"):
             for i, roi in enumerate(rois[device]):
                 x, y, w, h = roi
                 roi_hsv = hsv[y : y + h, x : x + w]
@@ -131,7 +139,9 @@ def detect_led_on_frames(processed_images, rois: dict):
     return led_on_frames
 
 
-def summarize_led_frames(frames_by_led):
+def summarize_led_frames(
+    frames_by_led: list[list[bool]],
+) -> tuple[list[bool], list[int]]:
     total_frames = len(frames_by_led[0])
     led_on_counts = np.zeros(7)
     blink_leds = []
@@ -155,7 +165,9 @@ def summarize_led_frames(frames_by_led):
     return led_states, blink_leds
 
 
-def build_result(device: str, led_states, blink_leds):
+def build_result(
+    device: DeviceName, led_states: list[bool], blink_leds: list[int]
+) -> CVBaseUnitResult:
     blink_set = set(blink_leds)
 
     if blink_set.issuperset({1, 2, 3, 5, 6, 7}) and 4 not in blink_set:
@@ -175,12 +187,13 @@ def build_result(device: str, led_states, blink_leds):
         }
 
     if blink_leds:
+        level: int | None
         if device == "chlorine":
             level = blink_leds[0]
         else:
             level = derive_level(led_states)
 
-        status = (
+        status: StatusLiteral = (
             "warning"
             if device == "chlorine" and blink_set.intersection({1, 2, 6, 7})
             else "ok"
@@ -224,18 +237,18 @@ def build_result(device: str, led_states, blink_leds):
     }
 
 
-def result_score(result):
+def result_score(result: CVAnalysisResult) -> int:
     score = 0
-    for device in ["chlorine", "ph"]:
-        if result[device]["level"] is not None:
+    for unit_result in (result["chlorine"], result["ph"]):
+        if unit_result["level"] is not None:
             score += 2
-        score += len(result[device]["blinking"])
-        if result[device]["mode"] != "unknown":
+        score += len(unit_result["blinking"])
+        if unit_result["mode"] != "unknown":
             score += 1
     return score
 
 
-def detect_shifted_ph_timeout(processed_images):
+def detect_shifted_ph_timeout(processed_images: list[np.ndarray]) -> bool:
     import cv2
 
     red_or_yellow_frames = 0
@@ -264,7 +277,7 @@ def detect_shifted_ph_timeout(processed_images):
     return red_or_yellow_frames >= 3 and green_frames >= 2
 
 
-def is_grayscale_privacy_frame(processed_images):
+def is_grayscale_privacy_frame(processed_images: list[np.ndarray]) -> bool:
     import cv2
 
     colorful_ratios = []
@@ -278,14 +291,33 @@ def is_grayscale_privacy_frame(processed_images):
         )
         colorful_ratios.append(colorful_ratio)
 
-    return max(colorful_ratios, default=0) < 0.01
+    return bool(max(colorful_ratios, default=0) < 0.01)
 
 
-def analyze_with_rois(processed_images, rois: dict):
+def analyze_with_rois(
+    processed_images: list[np.ndarray], rois: RoiMap
+) -> CVAnalysisResult:
     led_on_frames = detect_led_on_frames(processed_images, rois)
-    final_results = {}
+    final_results: CVAnalysisResult = {
+        "chlorine": {
+            "level": None,
+            "mode": "unknown",
+            "status": "unknown",
+            "diagnosis": "Unknown pattern",
+            "led_states": [False] * 7,
+            "blinking": [],
+        },
+        "ph": {
+            "level": None,
+            "mode": "unknown",
+            "status": "unknown",
+            "diagnosis": "Unknown pattern",
+            "led_states": [False] * 7,
+            "blinking": [],
+        },
+    }
 
-    for device in ["chlorine", "ph"]:
+    for device in ("chlorine", "ph"):
         led_states, blink_leds = summarize_led_frames(led_on_frames[device])
         result = build_result(device, led_states, blink_leds)
 
@@ -298,7 +330,7 @@ def analyze_with_rois(processed_images, rois: dict):
     return final_results
 
 
-def analyze_burst(images_bytes: list[bytes], rois: dict = ROIS):
+def analyze_burst(images_bytes: list[bytes], rois: RoiMap = ROIS) -> CVAnalysisResult:
     processed_images = [preprocess_image(img) for img in images_bytes]
 
     result = analyze_with_rois(processed_images, rois)

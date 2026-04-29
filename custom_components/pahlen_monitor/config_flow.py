@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import re
+from typing import Any
 
 import aiohttp
 import voluptuous as vol
@@ -30,10 +33,10 @@ INSTALLATION_ID_REGEX = re.compile(INSTALLATION_ID_PATTERN)
 class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
-    def __init__(self):
-        self._data = {}
+    def __init__(self) -> None:
+        self._data: dict[str, Any] = {}
 
-    async def async_step_user(self, user_input=None):
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> Any:
         if user_input is not None:
             self._data.update(user_input)
             if user_input[CONF_ROLE] == ROLE_PRODUCER:
@@ -47,7 +50,9 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
         )
 
-    async def async_step_producer(self, user_input=None):
+    async def async_step_producer(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
         errors = {}
         if user_input is not None:
             installation_id = user_input[CONF_INSTALLATION_ID]
@@ -97,7 +102,9 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_consumer(self, user_input=None):
+    async def async_step_consumer(
+        self, user_input: dict[str, Any] | None = None
+    ) -> Any:
         errors = {}
         if user_input is not None:
             installation_id = user_input[CONF_INSTALLATION_ID]
@@ -135,12 +142,12 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def _test_backend_url(self, url):
+    async def _test_backend_url(self, url: str) -> bool:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"{url.rstrip('/')}/health", timeout=10
                 ) as response:
-                    return response.status == 200
+                    return bool(response.status == 200)
         except Exception:
             return False

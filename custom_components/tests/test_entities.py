@@ -107,9 +107,10 @@ def coordinator_data(**overrides):
 @pytest.mark.asyncio
 async def test_sensor_setup_creates_pahlen_detail_entities_without_action_sensors():
     sensor = load_module("sensor")
-    entry = SimpleNamespace(entry_id="entry-1")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     coordinator = SimpleNamespace(data=coordinator_data())
-    hass = SimpleNamespace(data={"pahlen_monitor": {"entry-1": coordinator}})
+    entry.runtime_data = coordinator
+    hass = SimpleNamespace(data={})
     entities = []
 
     await sensor.async_setup_entry(hass, entry, entities.extend)
@@ -132,8 +133,9 @@ async def test_sensor_setup_creates_pahlen_detail_entities_without_action_sensor
 
 def test_detail_sensors_expose_backend_analysis_fields():
     sensor = load_module("sensor")
-    entry = SimpleNamespace(entry_id="entry-1")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     coordinator = SimpleNamespace(data=coordinator_data())
+    entry.runtime_data = coordinator
 
     summary = sensor.PahlenDetailSensor(
         coordinator, entry, "chlorine", "Free Chlorine", "summary"
@@ -161,11 +163,12 @@ def test_led_sensor_formats_solid_and_blinking_leds(
     solid_leds, blinking_leds, expected
 ):
     sensor = load_module("sensor")
-    entry = SimpleNamespace(entry_id="entry-1")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     data = coordinator_data()
     data["chlorine"]["solid_leds"] = solid_leds
     data["chlorine"]["blinking_leds"] = blinking_leds
     coordinator = SimpleNamespace(data=data)
+    entry.runtime_data = coordinator
 
     leds = sensor.PahlenLedSensor(coordinator, entry, "chlorine", "Free Chlorine")
 
@@ -193,8 +196,9 @@ def test_led_sensor_formats_solid_and_blinking_leds(
 )
 def test_problem_sensor_state_matrix(data, expected):
     binary_sensor = load_module("binary_sensor")
-    entry = SimpleNamespace(entry_id="entry-1")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     coordinator = SimpleNamespace(data=data)
+    entry.runtime_data = coordinator
 
     problem = binary_sensor.PahlenProblemSensor(coordinator, entry)
 
@@ -204,8 +208,9 @@ def test_problem_sensor_state_matrix(data, expected):
 
 def test_button_name_is_pahlen_prefixed():
     button = load_module("button")
-    entry = SimpleNamespace(entry_id="entry-1")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     coordinator = SimpleNamespace(data=coordinator_data())
+    entry.runtime_data = coordinator
 
     analyze = button.PahlenAnalyzeButton(coordinator, entry)
 
@@ -216,13 +221,14 @@ def test_button_name_is_pahlen_prefixed():
 async def test_producer_controls_reflect_installation_enabled_state():
     button = load_module("button")
     switch = load_module("switch")
-    entry = SimpleNamespace(entry_id="entry-1")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     coordinator = SimpleNamespace(
         data=coordinator_data(installation_enabled=True),
         installation_enabled=True,
         async_fetch_latest=AsyncMock(),
         async_set_installation_enabled=AsyncMock(),
     )
+    entry.runtime_data = coordinator
 
     fetch_latest = button.PahlenFetchLatestButton(coordinator, entry)
     installation_enabled = switch.PahlenInstallationEnabledSwitch(coordinator, entry)
@@ -243,7 +249,7 @@ def test_disabled_installation_keeps_data_non_problematic_and_buttons_offline():
     binary_sensor = load_module("binary_sensor")
     button = load_module("button")
     switch = load_module("switch")
-    entry = SimpleNamespace(entry_id="entry-1")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     coordinator = SimpleNamespace(
         installation_enabled=False,
         data=coordinator_data(
@@ -253,6 +259,7 @@ def test_disabled_installation_keeps_data_non_problematic_and_buttons_offline():
             stale=False,
         ),
     )
+    entry.runtime_data = coordinator
 
     problem = binary_sensor.PahlenProblemSensor(coordinator, entry)
     analyze = button.PahlenAnalyzeButton(coordinator, entry)
@@ -272,9 +279,11 @@ async def test_consumer_gets_no_producer_controls():
     entry = SimpleNamespace(
         entry_id="entry-1",
         data={"role": "consumer"},
+        runtime_data=SimpleNamespace(),
     )
     coordinator = SimpleNamespace(data=coordinator_data())
-    hass = SimpleNamespace(data={"pahlen_monitor": {"entry-1": coordinator}})
+    entry.runtime_data = coordinator
+    hass = SimpleNamespace(data={})
     entities = []
 
     await button.async_setup_entry(hass, entry, entities.extend)

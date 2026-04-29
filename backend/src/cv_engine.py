@@ -2,11 +2,17 @@ import logging
 from typing import Literal
 
 import numpy as np
-from schemas.models import CVAnalysisResult, CVBaseUnitResult, StatusLiteral
+from schemas.models import (
+    CVAnalysisResult,
+    CVBaseUnitResult,
+    CVUnitAnalysisPayload,
+    StatusLiteral,
+)
 
 _LOGGER = logging.getLogger(__name__)
 DeviceName = Literal["chlorine", "ph"]
 RoiMap = dict[DeviceName, list[list[int]]]
+TIMEOUT_BLINK_LEDS = [1, 2, 3, 5, 6, 7]
 
 CROP_X = 3500
 CROP_Y = 800
@@ -277,6 +283,27 @@ def detect_shifted_ph_timeout(processed_images: list[np.ndarray]) -> bool:
     return red_or_yellow_frames >= 3 and green_frames >= 2
 
 
+def timeout_ph_result() -> CVUnitAnalysisPayload:
+    return {
+        "level": None,
+        "mode": "error",
+        "status": "error",
+        "diagnosis": "Time-out (dosing stopped)",
+        "led_states": [False, False, False, False, False, False, False],
+        "blinking": list(TIMEOUT_BLINK_LEDS),
+    }
+
+
+def detect_privacy_mask_ph_timeout(processed_images: list[np.ndarray]) -> bool:
+    frames_by_led = detect_led_on_frames(processed_images, PRIVACY_MASK_ROIS)["ph"]
+    total_frames = len(frames_by_led[0])
+    min_on_frames = max(2, int(np.ceil(total_frames * 0.7)))
+
+    return all(
+        sum(frames_by_led[led - 1]) >= min_on_frames for led in TIMEOUT_BLINK_LEDS
+    )
+
+
 def is_grayscale_privacy_frame(processed_images: list[np.ndarray]) -> bool:
     import cv2
 
@@ -345,14 +372,11 @@ def analyze_burst(images_bytes: list[bytes], rois: RoiMap = ROIS) -> CVAnalysisR
             if result_score(candidate_result) > result_score(result):
                 result = candidate_result
 
-    if detect_shifted_ph_timeout(processed_images):
-        result["ph"] = {
-            "level": None,
-            "mode": "error",
-            "status": "error",
-            "diagnosis": "Time-out (dosing stopped)",
-            "led_states": [False, False, False, False, False, False, False],
-            "blinking": [1, 2, 3, 5, 6, 7],
-        }
+    if detect_shifted_ph_timeout(processed_images) or (
+        rois is ROIS
+        and is_grayscale_privacy_frame(processed_images)
+        and detect_privacy_mask_ph_timeout(processed_images)
+    ):
+        result["ph"] = timeout_ph_result()
 
     return result

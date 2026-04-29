@@ -134,6 +134,25 @@ FIXTURE_CASES = [
             },
         },
     ),
+    FixtureCase(
+        folder="burst_11_light_off_bw",
+        expected={
+            "chlorine": {
+                "level": 4,
+                "status": "ok",
+                "diagnosis": "Auto mode",
+                "led_states": [False, False, False, True, False, False, False],
+                "blinking": [],
+            },
+            "ph": {
+                "level": None,
+                "status": "error",
+                "diagnosis": "Time-out (dosing stopped)",
+                "led_states": [False, False, False, False, False, False, False],
+                "blinking": [1, 2, 3, 5, 6, 7],
+            },
+        },
+    ),
 ]
 
 

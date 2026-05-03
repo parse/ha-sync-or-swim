@@ -408,7 +408,7 @@ async def test_config_flow_backend_check_uses_shared_session(
     )
 
     assert await flow._test_backend_url("http://backend/") is expected
-    assert session.calls == [("http://backend/health", {"timeout": 10})]
+    assert session.calls == [("http://backend/api/health", {"timeout": 10})]
 
 
 @pytest.mark.asyncio

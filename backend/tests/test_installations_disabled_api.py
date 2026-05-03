@@ -14,7 +14,7 @@ def test_disabled_endpoint_requires_auth():
 
 def test_disabled_endpoint_rejects_bad_installation_id():
     response = client.post(
-        "/installations/Bad_Installation/disabled",
+        "/api/installations/Bad_Installation/disabled",
         headers={"Authorization": "Bearer test-token"},
     )
 
@@ -24,7 +24,7 @@ def test_disabled_endpoint_rejects_bad_installation_id():
 
 def test_disabled_endpoint_stores_latest_disabled_measurement():
     response = client.post(
-        "/installations/test-installation/disabled",
+        "/api/installations/test-installation/disabled",
         headers={"Authorization": "Bearer test-token"},
     )
 
@@ -68,3 +68,13 @@ def test_disabled_endpoint_stores_latest_disabled_measurement():
         assert latest.ph_recommended == "No action needed"
     finally:
         db.close()
+
+
+def test_legacy_disabled_endpoint_alias_still_works():
+    response = client.post(
+        "/installations/test-installation/disabled",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["installation_id"] == "test-installation"

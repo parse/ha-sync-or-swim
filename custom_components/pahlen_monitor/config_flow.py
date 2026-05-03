@@ -145,7 +145,9 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _test_backend_url(self, url: str) -> bool:
         try:
             session = async_get_clientsession(self.hass)
-            async with session.get(f"{url.rstrip('/')}/health", timeout=10) as response:
+            async with session.get(
+                f"{url.rstrip('/')}/api/health", timeout=10
+            ) as response:
                 return bool(response.status == 200)
         except Exception:
             return False

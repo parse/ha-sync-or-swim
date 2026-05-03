@@ -29,7 +29,7 @@ class PahlenApiClient:
 
     async def get_latest(self, installation_id: str) -> LatestMeasurement:
         async with self._session.get(
-            f"{self._backend_url}/latest/{installation_id}",
+            f"{self._backend_url}/api/latest/{installation_id}",
             headers=self._auth_headers(),
             timeout=10,
         ) as response:
@@ -61,7 +61,7 @@ class PahlenApiClient:
 
     async def store_disabled_state(self, installation_id: str) -> LatestMeasurement:
         async with self._session.post(
-            f"{self._backend_url}/installations/{installation_id}/disabled",
+            f"{self._backend_url}/api/installations/{installation_id}/disabled",
             headers=self._auth_headers(),
             timeout=10,
         ) as response:

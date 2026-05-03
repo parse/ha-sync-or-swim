@@ -14,15 +14,25 @@ app.add_middleware(
 )
 
 app.include_router(latest.router, prefix="/latest", tags=["latest"])
+app.include_router(latest.router, prefix="/api/latest", tags=["latest"])
 app.include_router(debug.router, prefix="/debug", tags=["debug"])
+app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 app.include_router(
     installations.router, prefix="/installations", tags=["installations"]
+)
+app.include_router(
+    installations.router, prefix="/api/installations", tags=["installations"]
 )
 app.include_router(analyze.router, prefix="/api/analyze", tags=["analyze"])
 
 
 @app.get("/health")
 async def health_check() -> dict[str, bool]:
+    return {"ok": True}
+
+
+@app.get("/api/health")
+async def api_health_check() -> dict[str, bool]:
     return {"ok": True}
 
 

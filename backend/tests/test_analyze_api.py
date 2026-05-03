@@ -57,6 +57,26 @@ def test_analyze_burst_endpoint_stores_latest(
     assert response.status_code == 200
 
     latest_response = client.get(
+        "/api/latest/test-installation",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert latest_response.status_code == 200
+    assert latest_response.json()["captured_at"] == response.json()["captured_at"]
+
+
+@pytest.mark.parametrize("case", fixture_case_params())
+def test_legacy_latest_endpoint_alias_still_works(
+    case: FixtureCase, multipart_files_builder
+):
+    response = client.post(
+        "/api/analyze/test-installation/burst",
+        headers={"Authorization": "Bearer test-token"},
+        files=multipart_files_builder(case.folder),
+    )
+    assert response.status_code == 200
+
+    latest_response = client.get(
         "/latest/test-installation",
         headers={"Authorization": "Bearer test-token"},
     )

@@ -116,7 +116,7 @@ async def test_get_latest_uses_auth_headers_and_validates_response():
     assert FakeSession.calls == [
         (
             "get",
-            "https://backend.example/latest/pool-1",
+            "https://backend.example/api/latest/pool-1",
             {"headers": {"Authorization": "Bearer secret"}, "timeout": 10},
         )
     ]
@@ -140,6 +140,14 @@ async def test_non_200_response_includes_status_and_body():
 
     with pytest.raises(api_client.PahlenApiError, match="500 boom"):
         await client.store_disabled_state("pool-1")
+
+    assert FakeSession.calls == [
+        (
+            "post",
+            "https://backend.example/api/installations/pool-1/disabled",
+            {"headers": {}, "timeout": 10},
+        )
+    ]
 
 
 @pytest.mark.asyncio

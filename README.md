@@ -37,8 +37,8 @@ For local checks, install `backend/requirements-dev.txt` alongside the backend r
 
 ## Backend Flow
 - Producers send camera bursts to `POST /api/analyze/{installation_id}/burst` with the configured bearer token.
-- The backend analyzes the images, stores the reading, and returns the same response shape used by `GET /latest/{installation_id}`.
-- Consumers continue polling `GET /latest/{installation_id}` with the configured bearer token.
+- The backend analyzes the images, stores the reading, and returns the same response shape used by `GET /api/latest/{installation_id}`.
+- Consumers continue polling `GET /api/latest/{installation_id}` with the configured bearer token.
 
 ### 2. Configuration
 - **Producer:** Add the integration and select "Producer". You'll need your camera entity, spotlight entity, backend URL, push token, and installation ID. Producer installations also expose `button.dosing_fetch_latest`, `button.dosing_analyze_now`, and `switch.installation_enabled`.

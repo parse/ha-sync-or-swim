@@ -18,13 +18,9 @@ from .const import (
     DEFAULT_INSTALLATION_ENABLED,
     DOMAIN,
     LIGHT_WARMUP_SECONDS,
-    STATUS_OK,
     STATUS_UNKNOWN,
 )
-from .contract_validation import (
-    PahlenData,
-    UnitAnalysis,
-)
+from .contract_validation import PahlenData
 from .entry_types import PahlenConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,31 +71,6 @@ def unknown_data() -> PahlenData:
     }
 
 
-def disabled_data(installation_id: str = "") -> PahlenData:
-    """Return data for a seasonally disabled installation."""
-    unit: UnitAnalysis = {
-        "status": STATUS_OK,
-        "diagnosis": "Installation disabled",
-        "pattern_detected": "disabled",
-        "blinking_leds": [],
-        "solid_leds": [],
-        "summary": "Installation disabled for the season",
-        "action_required": False,
-        "recommended_action": "No action required",
-    }
-    now = datetime.now(tz=timezone.utc).isoformat()
-    return {
-        "installation_id": installation_id,
-        "pushed_at": now,
-        "raw_response": None,
-        "chlorine": unit.copy(),
-        "ph": unit.copy(),
-        "captured_at": now,
-        "stale": False,
-        "error": None,
-    }
-
-
 class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
     """Data coordinator for the producer role."""
 
@@ -132,7 +103,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
         try:
             if not self.installation_enabled:
                 _LOGGER.debug("Producer analysis skipped because installation disabled")
-                return disabled_data(self._installation_id)
+                return await self._async_store_disabled_state()
 
             _LOGGER.debug("Starting producer analysis via backend")
 
@@ -228,12 +199,19 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
             await self.async_request_refresh()
             return
 
-        await self._async_store_disabled_state()
-        self.async_set_updated_data(disabled_data(self._installation_id))
+        disabled_state = await self._async_store_disabled_state()
+        self.async_set_updated_data(disabled_state)
 
-    async def _async_store_disabled_state(self) -> None:
+    async def _async_store_disabled_state(self) -> PahlenData:
         try:
-            await self._api_client.store_disabled_state(self._installation_id)
+            remote_data = await self._api_client.store_disabled_state(
+                self._installation_id
+            )
+            return {
+                **remote_data,
+                "stale": False,
+                "error": None,
+            }
         except Exception as exc:
             _LOGGER.exception("Error storing disabled state")
             if isinstance(exc, UpdateFailed):

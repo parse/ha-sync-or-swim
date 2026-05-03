@@ -1,5 +1,23 @@
 # Agent Guidelines
 
+## Project Shape
+
+Pahlen Monitor watches Pahlen MiniMaster pool dosing units using camera images.
+The Home Assistant integration captures image bursts, sends them to the
+FastAPI backend, and exposes the latest reading as sensors, buttons, switches,
+and a problem binary sensor.
+
+The backend is the source of truth. It analyzes LED patterns, decides dosing or
+measurement state, validates and shapes API responses, and stores measurements.
+Readings are persisted through SQLAlchemy using `DATABASE_URL`; tests use an
+in-memory SQLite database, while deployed environments provide the real database
+connection.
+
+Home Assistant has two roles. Producers capture camera bursts and send them to
+`POST /api/analyze/{installation_id}/burst`. Consumers poll
+`GET /latest/{installation_id}` for the latest stored backend reading. Both use
+the same backend response contract.
+
 Keep changes simple, strict, and easy to review. Read the nearby code before
 changing it, make sure the goal is clear, and avoid guessing about behavior or
 API shape when the code can answer the question.

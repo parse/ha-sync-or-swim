@@ -9,32 +9,32 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_ROLE, ROLE_PRODUCER
-from .entry_types import PahlenConfigEntry, require_runtime_coordinator
+from .entry_types import SyncOrSwimConfigEntry, require_runtime_coordinator
 
 if TYPE_CHECKING:
-    from .coordinator import PahlenCoordinator
+    from .coordinator import SyncOrSwimCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: PahlenConfigEntry,
+    entry: SyncOrSwimConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     if entry.data.get(CONF_ROLE) != ROLE_PRODUCER:
         return
 
     coordinator = require_runtime_coordinator(entry)
-    async_add_entities([PahlenInstallationEnabledSwitch(coordinator, entry)])
+    async_add_entities([SyncOrSwimInstallationEnabledSwitch(coordinator, entry)])
 
 
-class PahlenInstallationEnabledSwitch(CoordinatorEntity, SwitchEntity):
-    _attr_name = "Pahlen Installation Enabled"
+class SyncOrSwimInstallationEnabledSwitch(CoordinatorEntity, SwitchEntity):
+    _attr_name = "SyncOrSwim Installation Enabled"
     _attr_icon = "mdi:pool"
 
     def __init__(
-        self, coordinator: PahlenCoordinator, entry: PahlenConfigEntry
+        self, coordinator: SyncOrSwimCoordinator, entry: SyncOrSwimConfigEntry
     ) -> None:
         super().__init__(coordinator)
         self._coordinator = coordinator
@@ -45,9 +45,9 @@ class PahlenInstallationEnabledSwitch(CoordinatorEntity, SwitchEntity):
         return self._coordinator.installation_enabled
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        _LOGGER.debug("Enabling Pahlen installation monitoring")
+        _LOGGER.debug("Enabling SyncOrSwim installation monitoring")
         await self._coordinator.async_set_installation_enabled(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        _LOGGER.debug("Disabling Pahlen installation monitoring")
+        _LOGGER.debug("Disabling SyncOrSwim installation monitoring")
         await self._coordinator.async_set_installation_enabled(False)

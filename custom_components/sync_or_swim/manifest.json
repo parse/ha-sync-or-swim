@@ -1,6 +1,6 @@
 {
-  "domain": "pahlen_monitor",
-  "name": "Pahlen Monitor",
+  "domain": "sync_or_swim",
+  "name": "SyncOrSwim",
   "codeowners": ["@parse"],
   "config_flow": true,
   "dependencies": [],

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-PACKAGE_PATH = Path(__file__).resolve().parents[1] / "pahlen_monitor"
+PACKAGE_PATH = Path(__file__).resolve().parents[1] / "sync_or_swim"
 
 
 class DuplicateEntryConfigured(Exception):
@@ -141,15 +141,15 @@ def stub_modules():
 
 def load_module(module_name):
     stub_modules()
-    package = types.ModuleType("custom_components.pahlen_monitor")
+    package = types.ModuleType("custom_components.sync_or_swim")
     package.__path__ = [str(PACKAGE_PATH)]
-    sys.modules["custom_components.pahlen_monitor"] = package
-    sys.modules.pop(f"custom_components.pahlen_monitor.{module_name}", None)
-    return importlib.import_module(f"custom_components.pahlen_monitor.{module_name}")
+    sys.modules["custom_components.sync_or_swim"] = package
+    sys.modules.pop(f"custom_components.sync_or_swim.{module_name}", None)
+    return importlib.import_module(f"custom_components.sync_or_swim.{module_name}")
 
 
 def make_flow(config_flow):
-    flow = config_flow.PahlenMonitorConfigFlow()
+    flow = config_flow.SyncOrSwimMonitorConfigFlow()
     flow.hass = SimpleNamespace(
         states={
             "camera.pool": object(),
@@ -223,7 +223,7 @@ async def test_async_setup_entry_uses_runtime_data_and_unload_clears_it(
 @pytest.mark.asyncio
 async def test_config_flow_user_routes_to_role_specific_step(monkeypatch):
     config_flow = load_module("config_flow")
-    flow = config_flow.PahlenMonitorConfigFlow()
+    flow = config_flow.SyncOrSwimMonitorConfigFlow()
     producer = AsyncMock(return_value="producer-step")
     consumer = AsyncMock(return_value="consumer-step")
     monkeypatch.setattr(flow, "async_step_producer", producer)

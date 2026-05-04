@@ -1,5 +1,5 @@
 from auth import verify_token
-from db.models import Measurement
+from db.models import Installation, Measurement
 from db.session import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from measurement_service import latest_schema_from_measurement
@@ -33,4 +33,7 @@ async def get_latest_measurement(
             status_code=404, detail="No measurements found for this installation"
         )
 
-    return latest_schema_from_measurement(latest)
+    installation = db.get(Installation, installation_id)
+    sensors = installation.shared_sensors if installation else []
+
+    return latest_schema_from_measurement(latest, sensors)

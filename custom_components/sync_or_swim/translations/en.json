@@ -12,6 +12,7 @@
           "installation_id": "Installation ID",
           "camera_entity": "Camera entity",
           "light_entity": "Spotlight entity",
+          "shared_sensors": "Sensors to share",
           "push_token": "Push Token",
           "backend_url": "Backend URL",
           "scan_interval": "Scan interval (minutes)",

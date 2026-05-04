@@ -36,12 +36,27 @@ class UnitAnalysis(BaseModel):
     recommended_action: str
 
 
+class SharedSensorSchema(BaseModel):
+    key: str
+    label: str
+    value: str
+    unit: str | None = None
+    device_class: str | None = None
+    state_class: str | None = None
+    updated_at: datetime | None = None
+
+
+class PoolAnalysisSchema(BaseModel):
+    chlorine: UnitAnalysis
+    ph: UnitAnalysis
+
+
 class LatestMeasurementSchema(BaseModel):
     installation_id: str
     captured_at: datetime | None = None
     pushed_at: datetime | None = None
-    chlorine: UnitAnalysis
-    ph: UnitAnalysis
+    pool: PoolAnalysisSchema | None = None
+    sensors: list[SharedSensorSchema] = Field(default_factory=list)
     raw_response: str | None = None
 
 
@@ -49,6 +64,15 @@ class InstallationResponseSchema(BaseModel):
     id: str
     last_seen: datetime | None
     created_at: datetime | None
+
+
+class SharedSensorUpdateSchema(BaseModel):
+    key: str
+    label: str
+    value: str
+    unit: str | None = None
+    device_class: str | None = None
+    state_class: str | None = None
 
 
 def validate_installation_id(v: str) -> str:

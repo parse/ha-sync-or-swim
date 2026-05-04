@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING, NotRequired, TypedDict
 from homeassistant.config_entries import ConfigEntry
 
 if TYPE_CHECKING:
-    from .coordinator import PahlenCoordinator
+    from .coordinator import SyncOrSwimCoordinator
 
 
-class PahlenConfigEntryData(TypedDict):
+class SyncOrSwimConfigEntryData(TypedDict):
     role: str
     installation_id: str
     backend_url: str
@@ -20,18 +20,18 @@ class PahlenConfigEntryData(TypedDict):
     staleness_threshold: NotRequired[int]
 
 
-class PahlenConfigEntryOptions(TypedDict, total=False):
+class SyncOrSwimConfigEntryOptions(TypedDict, total=False):
     installation_enabled: bool
 
 
-class PahlenConfigEntry(ConfigEntry):
-    data: PahlenConfigEntryData
-    options: PahlenConfigEntryOptions
-    runtime_data: PahlenCoordinator | None
+class SyncOrSwimConfigEntry(ConfigEntry):
+    data: SyncOrSwimConfigEntryData
+    options: SyncOrSwimConfigEntryOptions
+    runtime_data: SyncOrSwimCoordinator | None
 
 
-def require_runtime_coordinator(entry: PahlenConfigEntry) -> PahlenCoordinator:
+def require_runtime_coordinator(entry: SyncOrSwimConfigEntry) -> SyncOrSwimCoordinator:
     coordinator = entry.runtime_data
     if coordinator is None:
-        raise RuntimeError("Pahlen coordinator has not been initialized")
+        raise RuntimeError("SyncOrSwim coordinator has not been initialized")
     return coordinator

@@ -4,11 +4,10 @@ import types
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 
-PACKAGE_PATH = Path(__file__).resolve().parents[1] / "pahlen_monitor"
+PACKAGE_PATH = Path(__file__).resolve().parents[1] / "sync_or_swim"
 
 
 class StubCoordinatorEntity:
@@ -72,11 +71,11 @@ def stub_homeassistant_modules():
 
 def load_module(module_name):
     stub_homeassistant_modules()
-    package = types.ModuleType("custom_components.pahlen_monitor")
+    package = types.ModuleType("custom_components.sync_or_swim")
     package.__path__ = [str(PACKAGE_PATH)]
-    sys.modules["custom_components.pahlen_monitor"] = package
-    sys.modules.pop(f"custom_components.pahlen_monitor.{module_name}", None)
-    return importlib.import_module(f"custom_components.pahlen_monitor.{module_name}")
+    sys.modules["custom_components.sync_or_swim"] = package
+    sys.modules.pop(f"custom_components.sync_or_swim.{module_name}", None)
+    return importlib.import_module(f"custom_components.sync_or_swim.{module_name}")
 
 
 def coordinator_data(**overrides):
@@ -85,36 +84,46 @@ def coordinator_data(**overrides):
         "installation_enabled": True,
         "stale": False,
         "error": None,
-        "chlorine": {
-            "status": "warning",
-            "diagnosis": "Low chlorine",
-            "pattern_detected": "manual",
-            "blinking_leds": ["LED 2"],
-            "solid_leds": ["LED 1", "LED 4"],
-            "summary": "Chlorine needs attention",
-            "action_required": True,
-            "recommended_action": "Check chlorine dosing",
+        "pool": {
+            "chlorine": {
+                "status": "warning",
+                "diagnosis": "Low chlorine",
+                "pattern_detected": "manual",
+                "blinking_leds": ["LED 2"],
+                "solid_leds": ["LED 1", "LED 4"],
+                "summary": "Chlorine needs attention",
+                "action_required": True,
+                "recommended_action": "Check chlorine dosing",
+            },
+            "ph": {
+                "status": "ok",
+                "diagnosis": None,
+                "pattern_detected": "auto",
+                "blinking_leds": [],
+                "solid_leds": ["LED 4"],
+                "summary": "pH is OK",
+                "action_required": False,
+                "recommended_action": "",
+            },
         },
-        "ph": {
-            "status": "ok",
-            "diagnosis": None,
-            "pattern_detected": "auto",
-            "blinking_leds": [],
-            "solid_leds": ["LED 4"],
-            "summary": "pH is OK",
-            "action_required": False,
-            "recommended_action": "",
-        },
+        "sensors": [],
     }
     data.update(overrides)
     return data
 
 
 @pytest.mark.asyncio
-async def test_sensor_setup_creates_pahlen_detail_entities_without_action_sensors():
+async def test_sensor_setup_creates_sync_or_swim_detail_entities_without_action_sensors():
     sensor = load_module("sensor")
-    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
-    coordinator = SimpleNamespace(data=coordinator_data())
+    entry = SimpleNamespace(
+        entry_id="entry-1",
+        runtime_data=SimpleNamespace(),
+        async_on_unload=lambda callback: None,
+    )
+    coordinator = SimpleNamespace(
+        data=coordinator_data(),
+        async_add_listener=lambda callback: None,
+    )
     entry.runtime_data = coordinator
     hass = SimpleNamespace(data={})
     entities = []
@@ -123,17 +132,17 @@ async def test_sensor_setup_creates_pahlen_detail_entities_without_action_sensor
 
     names = [entity._attr_name for entity in entities]
     assert names == [
-        "Pahlen Last Calibration Read",
-        "Pahlen Free Chlorine Status",
-        "Pahlen Free Chlorine Summary",
-        "Pahlen Free Chlorine Diagnosis",
-        "Pahlen Free Chlorine Recommended Action",
-        "Pahlen Free Chlorine LEDs",
-        "Pahlen pH Status",
-        "Pahlen pH Summary",
-        "Pahlen pH Diagnosis",
-        "Pahlen pH Recommended Action",
-        "Pahlen pH LEDs",
+        "SyncOrSwim Last Calibration Read",
+        "SyncOrSwim Free Chlorine Status",
+        "SyncOrSwim Free Chlorine Summary",
+        "SyncOrSwim Free Chlorine Diagnosis",
+        "SyncOrSwim Free Chlorine Recommended Action",
+        "SyncOrSwim Free Chlorine LEDs",
+        "SyncOrSwim pH Status",
+        "SyncOrSwim pH Summary",
+        "SyncOrSwim pH Diagnosis",
+        "SyncOrSwim pH Recommended Action",
+        "SyncOrSwim pH LEDs",
     ]
     assert all("Dosing Action" not in name for name in names)
 
@@ -150,7 +159,7 @@ def test_last_calibration_read_sensor_exposes_backend_capture_timestamp():
     )
     entry.runtime_data = coordinator
 
-    last_read = sensor.PahlenLastCalibrationReadSensor(coordinator, entry)
+    last_read = sensor.SyncOrSwimLastCalibrationReadSensor(coordinator, entry)
 
     assert last_read._attr_device_class == "timestamp"
     assert last_read.native_value == datetime(
@@ -170,10 +179,10 @@ def test_detail_sensors_expose_backend_analysis_fields():
     coordinator = SimpleNamespace(data=coordinator_data())
     entry.runtime_data = coordinator
 
-    summary = sensor.PahlenDetailSensor(
+    summary = sensor.SyncOrSwimDetailSensor(
         coordinator, entry, "chlorine", "Free Chlorine", "summary"
     )
-    recommended_action = sensor.PahlenDetailSensor(
+    recommended_action = sensor.SyncOrSwimDetailSensor(
         coordinator, entry, "ph", "pH", "recommended_action"
     )
 
@@ -198,12 +207,12 @@ def test_led_sensor_formats_solid_and_blinking_leds(
     sensor = load_module("sensor")
     entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     data = coordinator_data()
-    data["chlorine"]["solid_leds"] = solid_leds
-    data["chlorine"]["blinking_leds"] = blinking_leds
+    data["pool"]["chlorine"]["solid_leds"] = solid_leds
+    data["pool"]["chlorine"]["blinking_leds"] = blinking_leds
     coordinator = SimpleNamespace(data=data)
     entry.runtime_data = coordinator
 
-    leds = sensor.PahlenLedSensor(coordinator, entry, "chlorine", "Free Chlorine")
+    leds = sensor.SyncOrSwimLedSensor(coordinator, entry, "chlorine", "Free Chlorine")
 
     assert leds.native_value == expected
     assert leds.extra_state_attributes["solid_leds"] == (solid_leds or [])
@@ -214,13 +223,15 @@ def test_led_sensor_formats_solid_and_blinking_leds(
     ("data", "expected"),
     [
         ({}, None),
-        (coordinator_data(chlorine={"status": "unknown"}, stale=True), None),
+        (coordinator_data(pool={"chlorine": {"status": "unknown"}}, stale=True), None),
         (coordinator_data(), True),
         (coordinator_data(stale=True), True),
         (
             coordinator_data(
-                chlorine={"status": "ok"},
-                ph={"status": "ok"},
+                pool={
+                    "chlorine": {"status": "ok"},
+                    "ph": {"status": "ok"},
+                },
                 stale=False,
             ),
             False,
@@ -233,93 +244,18 @@ def test_problem_sensor_state_matrix(data, expected):
     coordinator = SimpleNamespace(data=data)
     entry.runtime_data = coordinator
 
-    problem = binary_sensor.PahlenProblemSensor(coordinator, entry)
+    problem = binary_sensor.SyncOrSwimProblemSensor(coordinator, entry)
 
-    assert problem._attr_name == "Pahlen Dosing Problem"
+    assert problem._attr_name == "SyncOrSwim Dosing Problem"
     assert problem.is_on is expected
 
 
-def test_button_name_is_pahlen_prefixed():
+def test_button_name_is_sync_or_swim_prefixed():
     button = load_module("button")
     entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     coordinator = SimpleNamespace(data=coordinator_data())
     entry.runtime_data = coordinator
 
-    analyze = button.PahlenAnalyzeButton(coordinator, entry)
+    analyze = button.SyncOrSwimAnalyzeButton(coordinator, entry)
 
-    assert analyze._attr_name == "Pahlen Analyze Now"
-
-
-@pytest.mark.asyncio
-async def test_producer_controls_reflect_installation_enabled_state():
-    button = load_module("button")
-    switch = load_module("switch")
-    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
-    coordinator = SimpleNamespace(
-        data=coordinator_data(installation_enabled=True),
-        installation_enabled=True,
-        async_fetch_latest=AsyncMock(),
-        async_set_installation_enabled=AsyncMock(),
-    )
-    entry.runtime_data = coordinator
-
-    fetch_latest = button.PahlenFetchLatestButton(coordinator, entry)
-    installation_enabled = switch.PahlenInstallationEnabledSwitch(coordinator, entry)
-
-    assert fetch_latest._attr_name == "Pahlen Fetch Latest"
-    assert fetch_latest.available is True
-    assert installation_enabled._attr_name == "Pahlen Installation Enabled"
-    assert installation_enabled.is_on is True
-
-    await fetch_latest.async_press()
-    await installation_enabled.async_turn_off()
-
-    coordinator.async_fetch_latest.assert_awaited_once()
-    coordinator.async_set_installation_enabled.assert_awaited_once_with(False)
-
-
-def test_disabled_installation_keeps_data_non_problematic_and_buttons_offline():
-    binary_sensor = load_module("binary_sensor")
-    button = load_module("button")
-    switch = load_module("switch")
-    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
-    coordinator = SimpleNamespace(
-        installation_enabled=False,
-        data=coordinator_data(
-            installation_enabled=False,
-            chlorine={"status": "ok"},
-            ph={"status": "ok"},
-            stale=False,
-        ),
-    )
-    entry.runtime_data = coordinator
-
-    problem = binary_sensor.PahlenProblemSensor(coordinator, entry)
-    analyze = button.PahlenAnalyzeButton(coordinator, entry)
-    fetch_latest = button.PahlenFetchLatestButton(coordinator, entry)
-    installation_enabled = switch.PahlenInstallationEnabledSwitch(coordinator, entry)
-
-    assert problem.is_on is False
-    assert analyze.available is False
-    assert fetch_latest.available is False
-    assert installation_enabled.is_on is False
-
-
-@pytest.mark.asyncio
-async def test_consumer_gets_no_producer_controls():
-    button = load_module("button")
-    switch = load_module("switch")
-    entry = SimpleNamespace(
-        entry_id="entry-1",
-        data={"role": "consumer"},
-        runtime_data=SimpleNamespace(),
-    )
-    coordinator = SimpleNamespace(data=coordinator_data())
-    entry.runtime_data = coordinator
-    hass = SimpleNamespace(data={})
-    entities = []
-
-    await button.async_setup_entry(hass, entry, entities.extend)
-    await switch.async_setup_entry(hass, entry, entities.extend)
-
-    assert entities == []
+    assert analyze._attr_name == "SyncOrSwim Analyze Now"

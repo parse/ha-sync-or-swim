@@ -16,14 +16,14 @@ def test_debug_endpoint_returns_latest_measurement_contract():
         "installation_id",
         "captured_at",
         "pushed_at",
-        "chlorine",
-        "ph",
+        "pool",
+        "sensors",
         "raw_response",
     }
     assert data["installation_id"] == "test-installation"
     assert data["raw_response"] is None
-    assert data["chlorine"]["status"] == "ok"
-    assert data["ph"]["status"] == "warning"
+    assert data["pool"]["chlorine"]["status"] == "ok"
+    assert data["pool"]["ph"]["status"] == "warning"
 
 
 def test_debug_endpoint_rejects_bad_installation_id():

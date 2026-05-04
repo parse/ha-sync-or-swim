@@ -4,6 +4,7 @@ from auth import verify_token
 from fastapi import APIRouter, Depends, HTTPException
 from schemas.models import (
     LatestMeasurementSchema,
+    PoolAnalysisSchema,
     UnitAnalysis,
     validate_installation_id,
 )
@@ -26,24 +27,26 @@ async def get_debug_measurement(
         captured_at=now,
         pushed_at=now,
         raw_response=None,
-        chlorine=UnitAnalysis(
-            status="ok",
-            diagnosis="Auto mode",
-            pattern_detected="LED 4 solid",
-            blinking_leds=[],
-            solid_leds=["LED 4 - green"],
-            summary="Normal operation.",
-            action_required=False,
-            recommended_action="No action required",
-        ),
-        ph=UnitAnalysis(
-            status="warning",
-            diagnosis="Standby mode",
-            pattern_detected="LED 5 blinking",
-            blinking_leds=["LED 5 - yellow"],
-            solid_leds=[],
-            summary="pH unit in standby.",
-            action_required=False,
-            recommended_action="Check if the pump is running",
+        pool=PoolAnalysisSchema(
+            chlorine=UnitAnalysis(
+                status="ok",
+                diagnosis="Auto mode",
+                pattern_detected="LED 4 solid",
+                blinking_leds=[],
+                solid_leds=["LED 4 - green"],
+                summary="Normal operation.",
+                action_required=False,
+                recommended_action="No action required",
+            ),
+            ph=UnitAnalysis(
+                status="warning",
+                diagnosis="Standby mode",
+                pattern_detected="LED 5 blinking",
+                blinking_leds=["LED 5 - yellow"],
+                solid_leds=[],
+                summary="pH unit in standby.",
+                action_required=False,
+                recommended_action="Check if the pump is running",
+            ),
         ),
     )

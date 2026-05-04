@@ -9,17 +9,17 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_ROLE, ROLE_PRODUCER
-from .entry_types import PahlenConfigEntry, require_runtime_coordinator
+from .entry_types import SyncOrSwimConfigEntry, require_runtime_coordinator
 
 if TYPE_CHECKING:
-    from .coordinator import PahlenCoordinator
+    from .coordinator import SyncOrSwimCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: PahlenConfigEntry,
+    entry: SyncOrSwimConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     if entry.data.get(CONF_ROLE) != ROLE_PRODUCER:
@@ -28,18 +28,18 @@ async def async_setup_entry(
     coordinator = require_runtime_coordinator(entry)
     async_add_entities(
         [
-            PahlenAnalyzeButton(coordinator, entry),
-            PahlenFetchLatestButton(coordinator, entry),
+            SyncOrSwimAnalyzeButton(coordinator, entry),
+            SyncOrSwimFetchLatestButton(coordinator, entry),
         ]
     )
 
 
-class PahlenAnalyzeButton(CoordinatorEntity, ButtonEntity):
-    _attr_name = "Pahlen Analyze Now"
+class SyncOrSwimAnalyzeButton(CoordinatorEntity, ButtonEntity):
+    _attr_name = "SyncOrSwim Analyze Now"
     _attr_icon = "mdi:camera-refresh"
 
     def __init__(
-        self, coordinator: PahlenCoordinator, entry: PahlenConfigEntry
+        self, coordinator: SyncOrSwimCoordinator, entry: SyncOrSwimConfigEntry
     ) -> None:
         super().__init__(coordinator)
         self._coordinator = coordinator
@@ -54,12 +54,12 @@ class PahlenAnalyzeButton(CoordinatorEntity, ButtonEntity):
         await self._coordinator.async_request_refresh()
 
 
-class PahlenFetchLatestButton(CoordinatorEntity, ButtonEntity):
-    _attr_name = "Pahlen Fetch Latest"
+class SyncOrSwimFetchLatestButton(CoordinatorEntity, ButtonEntity):
+    _attr_name = "SyncOrSwim Fetch Latest"
     _attr_icon = "mdi:cloud-refresh"
 
     def __init__(
-        self, coordinator: PahlenCoordinator, entry: PahlenConfigEntry
+        self, coordinator: SyncOrSwimCoordinator, entry: SyncOrSwimConfigEntry
     ) -> None:
         super().__init__(coordinator)
         self._coordinator = coordinator

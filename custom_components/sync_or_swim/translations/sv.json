@@ -12,6 +12,7 @@
           "installation_id": "Installations-ID",
           "camera_entity": "Kameraentitet",
           "light_entity": "Spotlightsentitet (kamerans lampa)",
+          "shared_sensors": "Sensorer att dela",
           "push_token": "Säkerhetstoken (Push Token)",
           "backend_url": "Backend-URL",
           "scan_interval": "Analysintervall (minuter)",

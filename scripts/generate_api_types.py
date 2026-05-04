@@ -10,7 +10,7 @@ from export_openapi import export_openapi
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GENERATED_TYPES = (
-    REPO_ROOT / "custom_components" / "pahlen_monitor" / "generated_api_types.py"
+    REPO_ROOT / "custom_components" / "sync_or_swim" / "generated_api_types.py"
 )
 
 

@@ -4,9 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-MODULE_PATH = (
-    Path(__file__).resolve().parents[1] / "pahlen_monitor" / "camera_payload.py"
-)
+MODULE_PATH = Path(__file__).resolve().parents[1] / "sync_or_swim" / "camera_payload.py"
 SPEC = importlib.util.spec_from_file_location("camera_payload", MODULE_PATH)
 camera_payload = importlib.util.module_from_spec(SPEC)
 assert SPEC is not None

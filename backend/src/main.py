@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import analyze, debug, installations, latest
 
-app = FastAPI(title="Pahlen Monitor API", version="1.0.0")
+app = FastAPI(title="SyncOrSwim", version="1.0.0")
 
 
 app.add_middleware(

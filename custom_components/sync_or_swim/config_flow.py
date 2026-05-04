@@ -17,6 +17,7 @@ from .const import (
     CONF_PUSH_TOKEN,
     CONF_ROLE,
     CONF_SCAN_INTERVAL,
+    CONF_SHARED_SENSORS,
     CONF_STALENESS_THRESHOLD,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
@@ -30,7 +31,7 @@ from .const import (
 INSTALLATION_ID_REGEX = re.compile(INSTALLATION_ID_PATTERN)
 
 
-class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class SyncOrSwimMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
@@ -88,6 +89,9 @@ class PahlenMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                     vol.Required(CONF_LIGHT_ENTITY): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="light")
+                    ),
+                    vol.Optional(CONF_SHARED_SENSORS): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor", multiple=True)
                     ),
                     vol.Required(CONF_PUSH_TOKEN): str,
                     vol.Required(CONF_BACKEND_URL): str,

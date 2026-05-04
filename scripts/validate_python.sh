@@ -7,7 +7,7 @@ if [ "${CI:-}" = "true" ]; then
 
   python -m ruff check custom_components backend scripts
   python -m ruff format --check custom_components backend scripts
-  python -m mypy backend/src custom_components/pahlen_monitor
+  python -m mypy backend/src custom_components/sync_or_swim
   python scripts/generate_api_types.py --check
 
   PYTHONPATH=backend/src \
@@ -47,7 +47,7 @@ run_check() {
 
 run_check "ruff" python -m ruff check custom_components backend scripts
 run_check "format" python -m ruff format --check custom_components backend scripts
-run_check "mypy" python -m mypy backend/src custom_components/pahlen_monitor
+run_check "mypy" python -m mypy backend/src custom_components/sync_or_swim
 run_check "api types" python scripts/generate_api_types.py --check
 run_check "tests" env \
   PYTHONPATH=backend/src \

@@ -6,11 +6,11 @@ from types import ModuleType
 import pytest
 from schemas.models import validate_installation_id
 
-CONST_PATH = Path(__file__).resolve().parents[1] / "pahlen_monitor" / "const.py"
+CONST_PATH = Path(__file__).resolve().parents[1] / "sync_or_swim" / "const.py"
 
 
 def load_const_module() -> ModuleType:
-    spec = importlib.util.spec_from_file_location("pahlen_monitor_const", CONST_PATH)
+    spec = importlib.util.spec_from_file_location("sync_or_swim_const", CONST_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Could not load {CONST_PATH}")
     module = importlib.util.module_from_spec(spec)

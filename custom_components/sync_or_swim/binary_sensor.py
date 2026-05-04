@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -12,29 +12,29 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import STATUS_ERROR, STATUS_WARNING
-from .entry_types import PahlenConfigEntry, require_runtime_coordinator
+from .entry_types import SyncOrSwimConfigEntry, require_runtime_coordinator
 
 if TYPE_CHECKING:
-    from .coordinator import PahlenCoordinator
+    from .coordinator import SyncOrSwimCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: PahlenConfigEntry,
+    entry: SyncOrSwimConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator = require_runtime_coordinator(entry)
-    async_add_entities([PahlenProblemSensor(coordinator, entry)])
+    async_add_entities([SyncOrSwimProblemSensor(coordinator, entry)])
 
 
-class PahlenProblemSensor(CoordinatorEntity, BinarySensorEntity):
+class SyncOrSwimProblemSensor(CoordinatorEntity, BinarySensorEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
-    _attr_name = "Pahlen Dosing Problem"
+    _attr_name = "SyncOrSwim Dosing Problem"
 
     def __init__(
-        self, coordinator: PahlenCoordinator, entry: PahlenConfigEntry
+        self, coordinator: SyncOrSwimCoordinator, entry: SyncOrSwimConfigEntry
     ) -> None:
         super().__init__(coordinator)
         self._coordinator = coordinator
@@ -46,8 +46,12 @@ class PahlenProblemSensor(CoordinatorEntity, BinarySensorEntity):
         if not data:
             return None
 
-        chlorine_status = data.get("chlorine", {}).get("status")
-        ph_status = data.get("ph", {}).get("status")
+        pool = data.get("pool")
+        if not pool:
+            return cast(bool | None, data.get("stale", False))
+
+        chlorine_status = pool.get("chlorine", {}).get("status")
+        ph_status = pool.get("ph", {}).get("status")
 
         if chlorine_status in (None, "unknown") or ph_status in (None, "unknown"):
             return None
@@ -64,10 +68,19 @@ class PahlenProblemSensor(CoordinatorEntity, BinarySensorEntity):
         if not data:
             return {}
 
-        return {
-            "chlorine_status": data["chlorine"]["status"],
-            "ph_status": data["ph"]["status"],
+        pool = data.get("pool")
+        attributes = {
             "stale": data.get("stale", False),
             "stale_since": data.get("captured_at") if data.get("stale") else None,
             "error": data.get("error"),
         }
+
+        if pool:
+            attributes.update(
+                {
+                    "chlorine_status": pool["chlorine"]["status"],
+                    "ph_status": pool["ph"]["status"],
+                }
+            )
+
+        return attributes

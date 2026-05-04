@@ -3,25 +3,27 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import cast
 
 from homeassistant.components import camera
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .api_client import PahlenApiClient, PahlenApiNotFound
+from .api_client import SyncOrSwimApiClient, SyncOrSwimApiNotFound
 from .camera_payload import normalize_camera_payload
 from .const import (
     BURST_COUNT,
     BURST_INTERVAL_SECONDS,
     CONF_INSTALLATION_ENABLED,
+    CONF_SHARED_SENSORS,
     DEFAULT_INSTALLATION_ENABLED,
     DOMAIN,
     LIGHT_WARMUP_SECONDS,
     STATUS_UNKNOWN,
 )
-from .contract_validation import PahlenData
-from .entry_types import PahlenConfigEntry
+from .contract_validation import SyncOrSwimData
+from .entry_types import SyncOrSwimConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,42 +41,45 @@ def compute_stale(captured_at_iso: str | None, threshold_minutes: int) -> bool:
         return True
 
 
-def unknown_data() -> PahlenData:
+def unknown_data() -> SyncOrSwimData:
     """Return data for an unknown state."""
     return {
         "installation_id": "",
         "pushed_at": None,
         "raw_response": None,
-        "chlorine": {
-            "status": STATUS_UNKNOWN,
-            "diagnosis": None,
-            "pattern_detected": None,
-            "blinking_leds": [],
-            "solid_leds": [],
-            "summary": "Unknown status",
-            "action_required": False,
-            "recommended_action": "",
+        "pool": {
+            "chlorine": {
+                "status": STATUS_UNKNOWN,
+                "diagnosis": None,
+                "pattern_detected": None,
+                "blinking_leds": [],
+                "solid_leds": [],
+                "summary": "Unknown status",
+                "action_required": False,
+                "recommended_action": "",
+            },
+            "ph": {
+                "status": STATUS_UNKNOWN,
+                "diagnosis": None,
+                "pattern_detected": None,
+                "blinking_leds": [],
+                "solid_leds": [],
+                "summary": "Unknown status",
+                "action_required": False,
+                "recommended_action": "",
+            },
         },
-        "ph": {
-            "status": STATUS_UNKNOWN,
-            "diagnosis": None,
-            "pattern_detected": None,
-            "blinking_leds": [],
-            "solid_leds": [],
-            "summary": "Unknown status",
-            "action_required": False,
-            "recommended_action": "",
-        },
+        "sensors": [],
         "captured_at": None,
         "stale": False,
         "error": None,
     }
 
 
-class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
+class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
     """Data coordinator for the producer role."""
 
-    def __init__(self, hass: HomeAssistant, entry: PahlenConfigEntry):
+    def __init__(self, hass: HomeAssistant, entry: SyncOrSwimConfigEntry):
         entry_data = entry.data
         interval_minutes = entry_data["scan_interval"]
         super().__init__(
@@ -87,7 +92,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
         self._entry_data = entry_data
         self._installation_id = entry_data["installation_id"]
         self._staleness_minutes = entry_data["staleness_threshold"]
-        self._api_client = PahlenApiClient(
+        self._api_client = SyncOrSwimApiClient(
             entry_data["backend_url"],
             entry_data.get("push_token"),
             async_get_clientsession(hass),
@@ -99,7 +104,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
             "installation_enabled", DEFAULT_INSTALLATION_ENABLED
         )
 
-    async def _async_update_data(self) -> PahlenData:
+    async def _async_update_data(self) -> SyncOrSwimData:
         try:
             if not self.installation_enabled:
                 _LOGGER.debug("Producer analysis skipped because installation disabled")
@@ -151,8 +156,35 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                 self._installation_id, images
             )
 
-            # 3. Process results from backend
-            result: PahlenData = {
+            # 3. Push shared sensors if any
+            shared_sensor_entities = cast(
+                list[str], self._entry_data.get(CONF_SHARED_SENSORS, [])
+            )
+            if shared_sensor_entities:
+                _LOGGER.debug("Pushing shared sensors: %s", shared_sensor_entities)
+                sensor_updates = []
+                for entity_id in shared_sensor_entities:
+                    state = self.hass.states.get(entity_id)
+                    if state:
+                        sensor_updates.append(
+                            {
+                                "key": entity_id,
+                                "label": state.attributes.get(
+                                    "friendly_name", entity_id
+                                ),
+                                "value": state.state,
+                                "unit": state.attributes.get("unit_of_measurement"),
+                                "device_class": state.attributes.get("device_class"),
+                                "state_class": state.attributes.get("state_class"),
+                            }
+                        )
+                if sensor_updates:
+                    await self._api_client.push_shared_sensors(
+                        self._installation_id, sensor_updates
+                    )
+
+            # 4. Process results from backend
+            result: SyncOrSwimData = {
                 **remote_data,
                 "stale": False,
                 "error": None,
@@ -170,7 +202,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
         remote_data = await self._async_fetch_latest_data()
         self.async_set_updated_data(remote_data)
 
-    async def _async_fetch_latest_data(self) -> PahlenData:
+    async def _async_fetch_latest_data(self) -> SyncOrSwimData:
         try:
             _LOGGER.debug("Fetching latest backend data for producer")
             remote_data = await self._api_client.get_latest(self._installation_id)
@@ -181,7 +213,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
                 ),
                 "error": None,
             }
-        except PahlenApiNotFound:
+        except SyncOrSwimApiNotFound:
             return unknown_data()
         except Exception as exc:
             _LOGGER.exception("Error fetching latest backend data")
@@ -202,7 +234,7 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
         disabled_state = await self._async_store_disabled_state()
         self.async_set_updated_data(disabled_state)
 
-    async def _async_store_disabled_state(self) -> PahlenData:
+    async def _async_store_disabled_state(self) -> SyncOrSwimData:
         try:
             remote_data = await self._api_client.store_disabled_state(
                 self._installation_id
@@ -219,10 +251,10 @@ class ProducerCoordinator(DataUpdateCoordinator[PahlenData]):
             raise UpdateFailed(f"Failed to store disabled state: {exc}") from exc
 
 
-class ConsumerCoordinator(DataUpdateCoordinator[PahlenData]):
+class ConsumerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
     """Data coordinator for the consumer role."""
 
-    def __init__(self, hass: HomeAssistant, entry: PahlenConfigEntry):
+    def __init__(self, hass: HomeAssistant, entry: SyncOrSwimConfigEntry):
         entry_data = entry.data
         interval_minutes = entry_data["poll_interval"]
         super().__init__(
@@ -235,17 +267,17 @@ class ConsumerCoordinator(DataUpdateCoordinator[PahlenData]):
         self._entry_data = entry_data
         self._installation_id = entry_data["installation_id"]
         self._staleness_minutes = entry_data["staleness_threshold"]
-        self._api_client = PahlenApiClient(
+        self._api_client = SyncOrSwimApiClient(
             entry_data["backend_url"],
             entry_data.get("push_token"),
             async_get_clientsession(hass),
         )
 
-    async def _async_update_data(self) -> PahlenData:
+    async def _async_update_data(self) -> SyncOrSwimData:
         try:
             _LOGGER.debug("Polling backend for latest data")
             remote_data = await self._api_client.get_latest(self._installation_id)
-            data: PahlenData = {
+            data: SyncOrSwimData = {
                 **remote_data,
                 "stale": compute_stale(
                     remote_data.get("captured_at"), self._staleness_minutes
@@ -253,7 +285,7 @@ class ConsumerCoordinator(DataUpdateCoordinator[PahlenData]):
                 "error": None,
             }
             return data
-        except PahlenApiNotFound:
+        except SyncOrSwimApiNotFound:
             _LOGGER.info("No data found for installation %s", self._installation_id)
             return unknown_data()
         except Exception as exc:
@@ -263,4 +295,4 @@ class ConsumerCoordinator(DataUpdateCoordinator[PahlenData]):
             raise UpdateFailed(f"Failed to fetch data: {exc}") from exc
 
 
-PahlenCoordinator = ProducerCoordinator | ConsumerCoordinator
+SyncOrSwimCoordinator = ProducerCoordinator | ConsumerCoordinator

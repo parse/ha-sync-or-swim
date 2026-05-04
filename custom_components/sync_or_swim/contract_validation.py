@@ -7,17 +7,25 @@ from .generated_api_types import (
     LatestMeasurementSchema as _LatestMeasurementSchema,
 )
 from .generated_api_types import (
+    PoolAnalysisSchema as _PoolAnalysisSchema,
+)
+from .generated_api_types import (
+    SharedSensorSchema as _SharedSensorSchema,
+)
+from .generated_api_types import (
     UnitAnalysis as _UnitAnalysis,
 )
 
 Status = Literal["ok", "warning", "error", "unknown"]
 InstallationResponse: TypeAlias = _InstallationResponseSchema
 LatestMeasurement: TypeAlias = _LatestMeasurementSchema
+PoolAnalysis: TypeAlias = _PoolAnalysisSchema
+SharedSensor: TypeAlias = _SharedSensorSchema
 UnitAnalysis: TypeAlias = _UnitAnalysis
 VALID_STATUSES = {"ok", "warning", "error", "unknown"}
 
 
-class PahlenData(_LatestMeasurementSchema):
+class SyncOrSwimData(_LatestMeasurementSchema):
     """Data structure used internally by the coordinator/entities."""
 
     stale: bool
@@ -86,6 +94,28 @@ def validate_unit_analysis(data: Any, field_name: str) -> UnitAnalysis:
     }
 
 
+def validate_shared_sensor(data: Any, field_name: str) -> SharedSensor:
+    """Validate a shared sensor payload."""
+    _require_type(data, dict, field_name)
+    _require_type(data.get("key"), str, f"{field_name}.key")
+    _require_type(data.get("label"), str, f"{field_name}.label")
+    _require_type(data.get("value"), str, f"{field_name}.value")
+    _require_nullable_string(data.get("unit"), f"{field_name}.unit")
+    _require_nullable_string(data.get("device_class"), f"{field_name}.device_class")
+    _require_nullable_string(data.get("state_class"), f"{field_name}.state_class")
+    _require_nullable_string(data.get("updated_at"), f"{field_name}.updated_at")
+
+    return {
+        "key": cast(str, data["key"]),
+        "label": cast(str, data["label"]),
+        "value": cast(str, data["value"]),
+        "unit": cast(str | None, data.get("unit")),
+        "device_class": cast(str | None, data.get("device_class")),
+        "state_class": cast(str | None, data.get("state_class")),
+        "updated_at": cast(str | None, data.get("updated_at")),
+    }
+
+
 def validate_latest_measurement(data: Any) -> LatestMeasurement:
     """Validate the backend response used by the consumer coordinator."""
 
@@ -95,12 +125,31 @@ def validate_latest_measurement(data: Any) -> LatestMeasurement:
     _require_nullable_string(data.get("pushed_at"), "pushed_at")
     _require_nullable_string(data.get("raw_response"), "raw_response")
 
+    pool_raw = data.get("pool")
+    pool = None
+    if pool_raw:
+        pool = cast(
+            PoolAnalysis,
+            {
+                "chlorine": validate_unit_analysis(
+                    pool_raw.get("chlorine"), "pool.chlorine"
+                ),
+                "ph": validate_unit_analysis(pool_raw.get("ph"), "pool.ph"),
+            },
+        )
+
+    sensors_raw = data.get("sensors", [])
+    _require_type(sensors_raw, list, "sensors")
+    sensors = [
+        validate_shared_sensor(s, f"sensors[{i}]") for i, s in enumerate(sensors_raw)
+    ]
+
     validated: _LatestMeasurementSchema = {
         "installation_id": cast(str, data["installation_id"]),
         "captured_at": cast(str | None, data.get("captured_at")),
         "pushed_at": cast(str | None, data.get("pushed_at")),
-        "chlorine": validate_unit_analysis(data.get("chlorine"), "chlorine"),
-        "ph": validate_unit_analysis(data.get("ph"), "ph"),
+        "pool": pool,
+        "sensors": sensors,
         "raw_response": cast(str | None, data.get("raw_response")),
     }
     return validated

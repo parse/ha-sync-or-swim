@@ -6,7 +6,7 @@ select = ["E", "W", "F", "I", "UP", "B", "C4"]
 ignore = ["E501", "B008"]
 
 [tool.mypy]
-files = ["backend/src", "custom_components/pahlen_monitor"]
+files = ["backend/src", "custom_components/sync_or_swim"]
 namespace_packages = true
 explicit_package_bases = true
 pretty = true
@@ -25,7 +25,7 @@ module = ["aiohttp", "homeassistant", "homeassistant.*", "voluptuous", "cv2"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = ["custom_components.pahlen_monitor.config_flow"]
+module = ["custom_components.sync_or_swim.config_flow"]
 disable_error_code = ["call-arg"]
 
 [tool.pytest.ini_options]

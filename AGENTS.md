@@ -2,7 +2,7 @@
 
 ## Project Shape
 
-Pahlen Monitor watches Pahlen MiniMaster pool dosing units using camera images.
+SyncOrSwim watches Pahlen MiniMaster pool dosing units using camera images.
 The Home Assistant integration captures image bursts, sends them to the
 FastAPI backend, and exposes the latest reading as sensors, buttons, switches,
 and a problem binary sensor.
@@ -45,6 +45,6 @@ Use the relevant local checks for the files you changed. Common checks include:
 
 - `ruff check custom_components backend scripts`
 - `ruff format --check custom_components backend scripts`
-- `mypy backend/src custom_components/pahlen_monitor`
+- `mypy backend/src custom_components/sync_or_swim`
 - `python scripts/generate_api_types.py --check`
 - `pytest`

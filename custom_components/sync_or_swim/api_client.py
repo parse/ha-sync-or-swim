@@ -1,20 +1,22 @@
 from __future__ import annotations
 
+from typing import Any
+
 import aiohttp
 
 from .camera_payload import CameraPayload
 from .contract_validation import LatestMeasurement, validate_latest_measurement
 
 
-class PahlenApiError(Exception):
-    """Raised when the Pahlen backend returns an unexpected response."""
+class SyncOrSwimApiError(Exception):
+    """Raised when the SyncOrSwim backend returns an unexpected response."""
 
 
-class PahlenApiNotFound(PahlenApiError):
+class SyncOrSwimApiNotFound(SyncOrSwimApiError):
     """Raised when the backend has no measurement for an installation."""
 
 
-class PahlenApiClient:
+class SyncOrSwimApiClient:
     """Small Home Assistant-friendly aiohttp client for the backend API."""
 
     def __init__(
@@ -34,7 +36,7 @@ class PahlenApiClient:
             timeout=10,
         ) as response:
             if response.status == 404:
-                raise PahlenApiNotFound("No data found for installation")
+                raise SyncOrSwimApiNotFound("No data found for installation")
             await self._raise_for_status(response, "Backend latest fetch failed")
             return validate_latest_measurement(await response.json())
 
@@ -70,6 +72,17 @@ class PahlenApiClient:
             )
             return validate_latest_measurement(await response.json())
 
+    async def push_shared_sensors(
+        self, installation_id: str, sensors: list[dict[str, Any]]
+    ) -> None:
+        async with self._session.post(
+            f"{self._backend_url}/api/installations/{installation_id}/sensors",
+            json=sensors,
+            headers=self._auth_headers(),
+            timeout=10,
+        ) as response:
+            await self._raise_for_status(response, "Backend sensor push failed")
+
     async def _raise_for_status(
         self, response: aiohttp.ClientResponse, message: str
     ) -> None:
@@ -77,4 +90,4 @@ class PahlenApiClient:
             return
 
         response_body = await response.text()
-        raise PahlenApiError(f"{message}: {response.status} {response_body}")
+        raise SyncOrSwimApiError(f"{message}: {response.status} {response_body}")

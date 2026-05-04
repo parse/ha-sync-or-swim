@@ -4,12 +4,12 @@ from homeassistant.core import HomeAssistant
 
 from .const import PLATFORMS, ROLE_PRODUCER
 from .coordinator import ConsumerCoordinator, ProducerCoordinator
-from .entry_types import PahlenConfigEntry
+from .entry_types import SyncOrSwimConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: PahlenConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: SyncOrSwimConfigEntry) -> bool:
     role = entry.data["role"]
 
     if role == ROLE_PRODUCER:
@@ -27,7 +27,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: PahlenConfigEntry) -> bo
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: PahlenConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: SyncOrSwimConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         entry.runtime_data = None

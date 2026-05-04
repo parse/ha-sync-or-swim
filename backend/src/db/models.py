@@ -21,6 +21,35 @@ class Installation(Base):
     measurements: Mapped[list["Measurement"]] = relationship(
         back_populates="installation"
     )
+    shared_sensors: Mapped[list["SharedSensor"]] = relationship(
+        back_populates="installation"
+    )
+
+
+class SharedSensor(Base):
+    __tablename__ = "shared_sensors"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    installation_id: Mapped[str] = mapped_column(
+        String, ForeignKey("installations.id"), nullable=False
+    )
+    key: Mapped[str] = mapped_column(String, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    value: Mapped[str] = mapped_column(String, nullable=False)
+    unit: Mapped[str | None] = mapped_column(String, nullable=True)
+    device_class: Mapped[str | None] = mapped_column(String, nullable=True)
+    state_class: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    installation: Mapped[Installation] = relationship(back_populates="shared_sensors")
+
+    __table_args__ = (
+        Index("idx_shared_sensors_inst_key", "installation_id", "key", unique=True),
+    )
 
 
 class Measurement(Base):

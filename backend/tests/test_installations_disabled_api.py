@@ -32,8 +32,9 @@ def test_disabled_endpoint_stores_latest_disabled_measurement():
     data = response.json()
     assert data["installation_id"] == "test-installation"
 
+    pool = data["pool"]
     for unit_name in ("chlorine", "ph"):
-        unit = data[unit_name]
+        unit = pool[unit_name]
         assert unit["status"] == "ok"
         assert unit["pattern_detected"] == "disabled"
         assert unit["blinking_leds"] == []

@@ -1,11 +1,14 @@
 from datetime import datetime, timezone
 from typing import cast
 
-from db.models import Installation, Measurement
+from db.models import Installation, Measurement, SharedSensor
 from schemas.models import (
     CVAnalysisResult,
     CVUnitAnalysisPayload,
     LatestMeasurementSchema,
+    PoolAnalysisSchema,
+    SharedSensorSchema,
+    SharedSensorUpdateSchema,
     StatusLiteral,
     UnitAnalysis,
 )
@@ -52,31 +55,51 @@ def unit_from_cv(data: CVUnitAnalysisPayload) -> UnitAnalysis:
     )
 
 
-def latest_schema_from_measurement(measurement: Measurement) -> LatestMeasurementSchema:
+def latest_schema_from_measurement(
+    measurement: Measurement, sensors: list[SharedSensor] | None = None
+) -> LatestMeasurementSchema:
+    sensor_schemas = []
+    if sensors:
+        for s in sensors:
+            sensor_schemas.append(
+                SharedSensorSchema(
+                    key=s.key,
+                    label=s.label,
+                    value=s.value,
+                    unit=s.unit,
+                    device_class=s.device_class,
+                    state_class=s.state_class,
+                    updated_at=s.updated_at,
+                )
+            )
+
     return LatestMeasurementSchema(
         installation_id=measurement.installation_id,
         captured_at=measurement.captured_at,
         pushed_at=measurement.pushed_at,
-        chlorine=UnitAnalysis(
-            status=status_from_db(measurement.chlorine_status),
-            diagnosis=measurement.chlorine_diagnosis,
-            pattern_detected=measurement.chlorine_pattern,
-            blinking_leds=measurement.chlorine_blinking or [],
-            solid_leds=measurement.chlorine_solid or [],
-            summary=measurement.chlorine_summary or "",
-            action_required=measurement.chlorine_action,
-            recommended_action=measurement.chlorine_recommended or "",
+        pool=PoolAnalysisSchema(
+            chlorine=UnitAnalysis(
+                status=status_from_db(measurement.chlorine_status),
+                diagnosis=measurement.chlorine_diagnosis,
+                pattern_detected=measurement.chlorine_pattern,
+                blinking_leds=measurement.chlorine_blinking or [],
+                solid_leds=measurement.chlorine_solid or [],
+                summary=measurement.chlorine_summary or "",
+                action_required=measurement.chlorine_action,
+                recommended_action=measurement.chlorine_recommended or "",
+            ),
+            ph=UnitAnalysis(
+                status=status_from_db(measurement.ph_status),
+                diagnosis=measurement.ph_diagnosis,
+                pattern_detected=measurement.ph_pattern,
+                blinking_leds=measurement.ph_blinking or [],
+                solid_leds=measurement.ph_solid or [],
+                summary=measurement.ph_summary or "",
+                action_required=measurement.ph_action,
+                recommended_action=measurement.ph_recommended or "",
+            ),
         ),
-        ph=UnitAnalysis(
-            status=status_from_db(measurement.ph_status),
-            diagnosis=measurement.ph_diagnosis,
-            pattern_detected=measurement.ph_pattern,
-            blinking_leds=measurement.ph_blinking or [],
-            solid_leds=measurement.ph_solid or [],
-            summary=measurement.ph_summary or "",
-            action_required=measurement.ph_action,
-            recommended_action=measurement.ph_recommended or "",
-        ),
+        sensors=sensor_schemas,
         raw_response=measurement.raw_response,
     )
 
@@ -125,7 +148,56 @@ def store_cv_result(
     db.commit()
     db.refresh(measurement)
 
-    return latest_schema_from_measurement(measurement)
+    return latest_schema_from_measurement(measurement, installation.shared_sensors)
+
+
+def store_shared_sensors(
+    db: Session,
+    installation_id: str,
+    updates: list[SharedSensorUpdateSchema],
+) -> list[SharedSensor]:
+    now = datetime.now(timezone.utc)
+
+    installation = db.get(Installation, installation_id)
+    if installation is None:
+        installation = Installation(id=installation_id, last_seen=now)
+        db.add(installation)
+    else:
+        installation.last_seen = now
+
+    for update in updates:
+        existing = (
+            db.query(SharedSensor)
+            .filter(
+                SharedSensor.installation_id == installation_id,
+                SharedSensor.key == update.key,
+            )
+            .first()
+        )
+
+        if existing:
+            existing.label = update.label
+            existing.value = update.value
+            existing.unit = update.unit
+            existing.device_class = update.device_class
+            existing.state_class = update.state_class
+            existing.updated_at = now
+        else:
+            new_sensor = SharedSensor(
+                installation_id=installation_id,
+                key=update.key,
+                label=update.label,
+                value=update.value,
+                unit=update.unit,
+                device_class=update.device_class,
+                state_class=update.state_class,
+                updated_at=now,
+            )
+            db.add(new_sensor)
+
+    db.commit()
+    db.refresh(installation)
+    return installation.shared_sensors
 
 
 def store_disabled_measurement(
@@ -168,4 +240,4 @@ def store_disabled_measurement(
     db.commit()
     db.refresh(measurement)
 
-    return latest_schema_from_measurement(measurement)
+    return latest_schema_from_measurement(measurement, installation.shared_sensors)

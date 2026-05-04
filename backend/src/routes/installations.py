@@ -2,10 +2,12 @@ from auth import verify_token
 from db.models import Installation
 from db.session import get_db
 from fastapi import APIRouter, Depends, HTTPException
-from measurement_service import store_disabled_measurement
+from measurement_service import store_disabled_measurement, store_shared_sensors
 from schemas.models import (
     InstallationResponseSchema,
     LatestMeasurementSchema,
+    SharedSensorSchema,
+    SharedSensorUpdateSchema,
     validate_installation_id,
 )
 from sqlalchemy import desc
@@ -42,3 +44,30 @@ async def disable_installation(
         raise HTTPException(status_code=400, detail=str(e)) from e
 
     return store_disabled_measurement(db, installation_id)
+
+
+@router.post("/{installation_id}/sensors", response_model=list[SharedSensorSchema])
+async def update_sensors(
+    installation_id: str,
+    updates: list[SharedSensorUpdateSchema],
+    db: Session = Depends(get_db),
+    _auth: None = Depends(verify_token),
+) -> list[SharedSensorSchema]:
+    try:
+        validate_installation_id(installation_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    sensors = store_shared_sensors(db, installation_id, updates)
+    return [
+        SharedSensorSchema(
+            key=s.key,
+            label=s.label,
+            value=s.value,
+            unit=s.unit,
+            device_class=s.device_class,
+            state_class=s.state_class,
+            updated_at=s.updated_at,
+        )
+        for s in sensors
+    ]

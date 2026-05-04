@@ -16,6 +16,25 @@ class InstallationResponseSchema(TypedDict):
     last_seen: str | None
 
 
+class SharedSensorSchema(TypedDict):
+    device_class: NotRequired[str | None]
+    key: str
+    label: str
+    state_class: NotRequired[str | None]
+    unit: NotRequired[str | None]
+    updated_at: NotRequired[str | None]
+    value: str
+
+
+class SharedSensorUpdateSchema(TypedDict):
+    device_class: NotRequired[str | None]
+    key: str
+    label: str
+    state_class: NotRequired[str | None]
+    unit: NotRequired[str | None]
+    value: str
+
+
 class UnitAnalysis(TypedDict):
     action_required: bool
     blinking_leds: NotRequired[list[str]]
@@ -39,10 +58,15 @@ class HTTPValidationError(TypedDict):
     detail: NotRequired[list[ValidationError]]
 
 
+class PoolAnalysisSchema(TypedDict):
+    chlorine: UnitAnalysis
+    ph: UnitAnalysis
+
+
 class LatestMeasurementSchema(TypedDict):
     captured_at: NotRequired[str | None]
-    chlorine: UnitAnalysis
     installation_id: str
-    ph: UnitAnalysis
+    pool: NotRequired[PoolAnalysisSchema | None]
     pushed_at: NotRequired[str | None]
     raw_response: NotRequired[str | None]
+    sensors: NotRequired[list[SharedSensorSchema]]

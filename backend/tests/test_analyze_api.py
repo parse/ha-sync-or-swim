@@ -30,17 +30,20 @@ def test_analyze_burst_endpoint(case: FixtureCase, multipart_files_builder):
     assert response.status_code == 200
     data = response.json()
 
+    pool_data = data.get("pool", {})
     for device, expected in case.expected.items():
-        assert data[device]["status"] == expected["status"], f"{device} status mismatch"
-        assert data[device]["diagnosis"] == expected["diagnosis"], (
+        assert pool_data[device]["status"] == expected["status"], (
+            f"{device} status mismatch"
+        )
+        assert pool_data[device]["diagnosis"] == expected["diagnosis"], (
             f"{device} diagnosis mismatch"
         )
-        assert data[device]["solid_leds"] == [
+        assert pool_data[device]["solid_leds"] == [
             f"LED {idx + 1}"
             for idx, is_on in enumerate(expected["led_states"])
             if is_on
         ], f"{device} solid_leds mismatch"
-        assert data[device]["blinking_leds"] == [
+        assert pool_data[device]["blinking_leds"] == [
             f"LED {led}" for led in expected["blinking"]
         ], f"{device} blinking_leds mismatch"
 

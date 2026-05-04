@@ -1,6 +1,6 @@
 from typing import Final, Literal
 
-DOMAIN = "pahlen_monitor"
+DOMAIN = "sync_or_swim"
 INSTALLATION_ID_PATTERN = r"^[a-z0-9-]{1,64}$"
 
 # Roles
@@ -18,12 +18,14 @@ CONF_SCAN_INTERVAL = "scan_interval"  # minutes
 CONF_POLL_INTERVAL = "poll_interval"  # minutes
 CONF_STALENESS_THRESHOLD = "staleness_threshold"  # minutes
 CONF_INSTALLATION_ENABLED = "installation_enabled"
+CONF_SHARED_SENSORS = "shared_sensors"
 
 # Defaults
 DEFAULT_SCAN_INTERVAL = 60
 DEFAULT_POLL_INTERVAL = 30
 DEFAULT_STALENESS_THRESHOLD = 120
 DEFAULT_INSTALLATION_ENABLED = True
+DEFAULT_SHARED_SENSORS_INTERVAL = 60
 LIGHT_WARMUP_SECONDS = 1.5
 BURST_COUNT = 8
 BURST_INTERVAL_SECONDS = 0.4

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-PACKAGE_PATH = Path(__file__).resolve().parents[1] / "pahlen_monitor"
+PACKAGE_PATH = Path(__file__).resolve().parents[1] / "sync_or_swim"
 
 
 def sample_measurement():
@@ -15,22 +15,25 @@ def sample_measurement():
         "captured_at": "2026-04-28T18:16:36Z",
         "pushed_at": "2026-04-28T18:16:37Z",
         "raw_response": None,
-        "chlorine": {
-            "status": "ok",
-            "summary": "Chlorine is OK",
-            "action_required": False,
-            "recommended_action": "",
+        "pool": {
+            "chlorine": {
+                "status": "ok",
+                "summary": "Chlorine is OK",
+                "action_required": False,
+                "recommended_action": "",
+            },
+            "ph": {
+                "status": "warning",
+                "diagnosis": "Standby mode",
+                "pattern_detected": "LED 5 blinking",
+                "blinking_leds": ["LED 5"],
+                "solid_leds": [],
+                "summary": "pH unit in standby",
+                "action_required": False,
+                "recommended_action": "Check pump",
+            },
         },
-        "ph": {
-            "status": "warning",
-            "diagnosis": "Standby mode",
-            "pattern_detected": "LED 5 blinking",
-            "blinking_leds": ["LED 5"],
-            "solid_leds": [],
-            "summary": "pH unit in standby",
-            "action_required": False,
-            "recommended_action": "Check pump",
-        },
+        "sensors": [],
     }
 
 
@@ -86,33 +89,33 @@ def load_api_client():
     aiohttp.FormData = FakeFormData
     sys.modules["aiohttp"] = aiohttp
 
-    package = types.ModuleType("custom_components.pahlen_monitor")
+    package = types.ModuleType("custom_components.sync_or_swim")
     package.__path__ = [str(PACKAGE_PATH)]
-    sys.modules["custom_components.pahlen_monitor"] = package
+    sys.modules["custom_components.sync_or_swim"] = package
     for module_name in (
         "api_client",
         "camera_payload",
         "contract_validation",
         "generated_api_types",
     ):
-        sys.modules.pop(f"custom_components.pahlen_monitor.{module_name}", None)
+        sys.modules.pop(f"custom_components.sync_or_swim.{module_name}", None)
     FakeSession.calls = []
     FakeSession.responses = []
-    return importlib.import_module("custom_components.pahlen_monitor.api_client")
+    return importlib.import_module("custom_components.sync_or_swim.api_client")
 
 
 @pytest.mark.asyncio
 async def test_get_latest_uses_auth_headers_and_validates_response():
     api_client = load_api_client()
     FakeSession.responses = [FakeResponse(payload=sample_measurement())]
-    client = api_client.PahlenApiClient(
+    client = api_client.SyncOrSwimApiClient(
         "https://backend.example/", "secret", FakeSession()
     )
 
     data = await client.get_latest("pool-1")
 
     assert data["installation_id"] == "pool-1"
-    assert data["chlorine"]["blinking_leds"] == []
+    assert data["pool"]["chlorine"]["blinking_leds"] == []
     assert FakeSession.calls == [
         (
             "get",
@@ -126,9 +129,11 @@ async def test_get_latest_uses_auth_headers_and_validates_response():
 async def test_get_latest_raises_not_found_for_404():
     api_client = load_api_client()
     FakeSession.responses = [FakeResponse(status=404)]
-    client = api_client.PahlenApiClient("https://backend.example", None, FakeSession())
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession()
+    )
 
-    with pytest.raises(api_client.PahlenApiNotFound):
+    with pytest.raises(api_client.SyncOrSwimApiNotFound):
         await client.get_latest("pool-1")
 
 
@@ -136,9 +141,11 @@ async def test_get_latest_raises_not_found_for_404():
 async def test_non_200_response_includes_status_and_body():
     api_client = load_api_client()
     FakeSession.responses = [FakeResponse(status=500, text="boom")]
-    client = api_client.PahlenApiClient("https://backend.example", None, FakeSession())
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession()
+    )
 
-    with pytest.raises(api_client.PahlenApiError, match="500 boom"):
+    with pytest.raises(api_client.SyncOrSwimApiError, match="500 boom"):
         await client.store_disabled_state("pool-1")
 
     assert FakeSession.calls == [
@@ -154,7 +161,7 @@ async def test_non_200_response_includes_status_and_body():
 async def test_analyze_burst_uploads_multipart_images():
     api_client = load_api_client()
     FakeSession.responses = [FakeResponse(payload=sample_measurement())]
-    client = api_client.PahlenApiClient(
+    client = api_client.SyncOrSwimApiClient(
         "https://backend.example", "secret", FakeSession()
     )
     image = SimpleNamespace(content=b"image-bytes", content_type="image/jpeg")

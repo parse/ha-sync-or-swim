@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 UnitName = Literal["chlorine", "ph"]
+INVALID_SHARED_SENSOR_VALUES = {"unknown", "unavailable"}
 
 
 async def async_setup_entry(
@@ -95,7 +96,8 @@ class SyncOrSwimSharedSensor(CoordinatorEntity, SensorEntity):
         sensors = self._coordinator.data.get("sensors", [])
         for s in sensors:
             if s["key"] == self._key:
-                return s["value"]
+                value = s["value"]
+                return None if value in INVALID_SHARED_SENSOR_VALUES else value
         return None
 
     @property

@@ -240,6 +240,56 @@ async def test_config_flow_user_routes_to_role_specific_step(monkeypatch):
     producer.assert_not_awaited()
 
 
+def test_shared_sensor_update_from_state_skips_unavailable_values():
+    coordinator = load_module("coordinator")
+    unavailable_state = SimpleNamespace(
+        state="unavailable",
+        attributes={
+            "friendly_name": "Temperature",
+            "unit_of_measurement": "C",
+            "device_class": "temperature",
+            "state_class": "measurement",
+        },
+    )
+
+    assert (
+        coordinator.shared_sensor_update_from_state(
+            "sensor.temp_sensor_cellar_temperature", unavailable_state
+        )
+        is None
+    )
+    assert (
+        coordinator.shared_sensor_update_from_state(
+            "sensor.temp_sensor_cellar_temperature", None
+        )
+        is None
+    )
+
+
+def test_shared_sensor_update_from_state_preserves_available_values():
+    coordinator = load_module("coordinator")
+    state = SimpleNamespace(
+        state="12.3",
+        attributes={
+            "friendly_name": "Temperature",
+            "unit_of_measurement": "C",
+            "device_class": "temperature",
+            "state_class": "measurement",
+        },
+    )
+
+    assert coordinator.shared_sensor_update_from_state(
+        "sensor.temp_sensor_cellar_temperature", state
+    ) == {
+        "key": "sensor.temp_sensor_cellar_temperature",
+        "label": "Temperature",
+        "value": "12.3",
+        "unit": "C",
+        "device_class": "temperature",
+        "state_class": "measurement",
+    }
+
+
 @pytest.mark.asyncio
 async def test_config_flow_producer_creates_entry(monkeypatch):
     config_flow = load_module("config_flow")

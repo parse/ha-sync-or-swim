@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import cast
+from typing import Any, cast
 
 from homeassistant.components import camera
 from homeassistant.core import HomeAssistant
@@ -26,6 +26,7 @@ from .contract_validation import SyncOrSwimData
 from .entry_types import SyncOrSwimConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
+INVALID_SHARED_SENSOR_STATES = {"unknown", "unavailable"}
 
 
 def compute_stale(captured_at_iso: str | None, threshold_minutes: int) -> bool:
@@ -73,6 +74,22 @@ def unknown_data() -> SyncOrSwimData:
         "captured_at": None,
         "stale": False,
         "error": None,
+    }
+
+
+def shared_sensor_update_from_state(
+    entity_id: str, state: Any
+) -> dict[str, Any] | None:
+    if state is None or state.state in INVALID_SHARED_SENSOR_STATES:
+        return None
+
+    return {
+        "key": entity_id,
+        "label": state.attributes.get("friendly_name", entity_id),
+        "value": state.state,
+        "unit": state.attributes.get("unit_of_measurement"),
+        "device_class": state.attributes.get("device_class"),
+        "state_class": state.attributes.get("state_class"),
     }
 
 
@@ -165,19 +182,9 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
                 sensor_updates = []
                 for entity_id in shared_sensor_entities:
                     state = self.hass.states.get(entity_id)
-                    if state:
-                        sensor_updates.append(
-                            {
-                                "key": entity_id,
-                                "label": state.attributes.get(
-                                    "friendly_name", entity_id
-                                ),
-                                "value": state.state,
-                                "unit": state.attributes.get("unit_of_measurement"),
-                                "device_class": state.attributes.get("device_class"),
-                                "state_class": state.attributes.get("state_class"),
-                            }
-                        )
+                    sensor_update = shared_sensor_update_from_state(entity_id, state)
+                    if sensor_update:
+                        sensor_updates.append(sensor_update)
                 if sensor_updates:
                     await self._api_client.push_shared_sensors(
                         self._installation_id, sensor_updates

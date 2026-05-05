@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -17,6 +18,16 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 UnitName = Literal["chlorine", "ph"]
 INVALID_SHARED_SENSOR_VALUES = {"unknown", "unavailable"}
+GENERIC_SHARED_SENSOR_LABELS = {
+    "battery",
+    "current",
+    "energy",
+    "humidity",
+    "illuminance",
+    "power",
+    "temperature",
+    "voltage",
+}
 
 
 async def async_setup_entry(
@@ -85,7 +96,11 @@ class SyncOrSwimSharedSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._coordinator = coordinator
         self._key = sensor_data["key"]
-        self._attr_name = f"Shared {sensor_data['label']}"
+        display_label = shared_sensor_display_label(self._key, sensor_data["label"])
+        self._attr_name = f"SyncOrSwim Shared {display_label}"
+        self._attr_suggested_object_id = (
+            f"syncorswim_shared_{slugify_shared_sensor_name(display_label)}"
+        )
         self._attr_unique_id = f"{entry.entry_id}_shared_{self._key}"
         self._attr_device_class = sensor_data.get("device_class")
         self._attr_state_class = sensor_data.get("state_class")
@@ -268,6 +283,22 @@ def format_leds(solid_leds: list[str] | None, blinking_leds: list[str] | None) -
     if blinking_leds:
         parts.append(f"Blinking: {', '.join(blinking_leds)}")
     return "; ".join(parts) if parts else "none"
+
+
+def shared_sensor_display_label(key: str, label: str) -> str:
+    if label.strip().lower() not in GENERIC_SHARED_SENSOR_LABELS:
+        return label
+
+    object_id = key.split(".", 1)[-1]
+    parts = [p for p in object_id.split("_") if p and p not in {"sensor", "temp"}]
+    if parts:
+        return " ".join(p.capitalize() for p in parts)
+    return label
+
+
+def slugify_shared_sensor_name(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+    return slug or "sensor"
 
 
 def parse_backend_timestamp(value: str | None) -> datetime | None:

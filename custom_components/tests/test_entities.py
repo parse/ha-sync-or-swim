@@ -285,6 +285,33 @@ def test_shared_sensor_exposes_none_for_unavailable_backend_value():
     assert shared_sensor.extra_state_attributes["original_label"] == "Temperature"
 
 
+def test_shared_sensor_uses_specific_name_and_suggested_object_id():
+    sensor = load_module("sensor")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
+    shared_sensor_data = {
+        "key": "sensor.temp_sensor_cellar_temperature",
+        "label": "Temperature",
+        "value": "12.3",
+        "unit": "C",
+        "device_class": "temperature",
+        "state_class": "measurement",
+        "updated_at": "2026-05-05T10:00:00Z",
+    }
+    coordinator = SimpleNamespace(data=coordinator_data(sensors=[shared_sensor_data]))
+    entry.runtime_data = coordinator
+
+    shared_sensor = sensor.SyncOrSwimSharedSensor(
+        coordinator, entry, shared_sensor_data
+    )
+
+    assert shared_sensor._attr_name == "SyncOrSwim Shared Cellar Temperature"
+    assert (
+        shared_sensor._attr_suggested_object_id
+        == "syncorswim_shared_cellar_temperature"
+    )
+    assert shared_sensor.native_value == "12.3"
+
+
 @pytest.mark.asyncio
 async def test_producer_controls_reflect_installation_enabled_state():
     button = load_module("button")

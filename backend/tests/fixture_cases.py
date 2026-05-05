@@ -159,7 +159,7 @@ FIXTURE_CASES = [
             "chlorine": {
                 "level": 5,
                 "status": "warning",
-                "diagnosis": "High chlorine",
+                "diagnosis": "Above target",
                 "led_states": [False, False, False, False, True, False, False],
                 "blinking": [],
             },

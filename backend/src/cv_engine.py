@@ -238,14 +238,6 @@ def build_result(
             "diagnosis": "Time-out (dosing stopped)",
         }
 
-    if {1, 7}.issubset(blink_set):
-        return {
-            "level": derive_level(led_states),
-            "mode": "error",
-            "status": "error",
-            "diagnosis": "Flow Error / Uncalibrated",
-        }
-
     if blink_leds:
         level: int | None
         if device == "chlorine":
@@ -277,30 +269,20 @@ def build_result(
         }
 
     if any(led_states):
-        if (device == "chlorine" and level in {1, 2, 3}) or (
-            device == "ph" and level in {5, 6, 7}
-        ):
+        if level in {1, 2, 3}:
             return {
                 "level": level,
-                "mode": "dosing",
-                "status": "ok",
-                "diagnosis": "Dosing active",
+                "mode": "dosing" if device == "chlorine" else "unknown",
+                "status": "warning",
+                "diagnosis": "Below target",
             }
 
-        if device == "chlorine" and level in {5, 6, 7}:
+        if level in {5, 6, 7}:
             return {
                 "level": level,
-                "mode": "unknown",
+                "mode": "dosing" if device == "ph" else "unknown",
                 "status": "warning",
-                "diagnosis": "High chlorine",
-            }
-
-        if device == "ph" and level in {1, 2, 3}:
-            return {
-                "level": level,
-                "mode": "unknown",
-                "status": "warning",
-                "diagnosis": "Low pH",
+                "diagnosis": "Above target",
             }
 
         return {

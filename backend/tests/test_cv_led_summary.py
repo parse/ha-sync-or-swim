@@ -37,50 +37,50 @@ def led_state(level: int) -> list[bool]:
 
 
 @pytest.mark.parametrize("level", [1, 2, 3])
-def test_chlorine_low_stable_leds_are_dosing(level):
+def test_chlorine_low_stable_leds_are_warning(level):
     result = build_result("chlorine", led_state(level), [])
 
     assert result == {
         "level": level,
         "mode": "dosing",
-        "status": "ok",
-        "diagnosis": "Dosing active",
+        "status": "warning",
+        "diagnosis": "Below target",
     }
 
 
 @pytest.mark.parametrize("level", [5, 6, 7])
-def test_chlorine_high_stable_leds_are_warning_not_dosing(level):
+def test_chlorine_high_stable_leds_are_warning(level):
     result = build_result("chlorine", led_state(level), [])
 
     assert result == {
         "level": level,
         "mode": "unknown",
         "status": "warning",
-        "diagnosis": "High chlorine",
+        "diagnosis": "Above target",
     }
 
 
 @pytest.mark.parametrize("level", [1, 2, 3])
-def test_ph_low_stable_leds_are_warning_not_dosing(level):
+def test_ph_low_stable_leds_are_warning(level):
     result = build_result("ph", led_state(level), [])
 
     assert result == {
         "level": level,
         "mode": "unknown",
         "status": "warning",
-        "diagnosis": "Low pH",
+        "diagnosis": "Below target",
     }
 
 
 @pytest.mark.parametrize("level", [5, 6, 7])
-def test_ph_high_stable_leds_are_dosing(level):
+def test_ph_high_stable_leds_are_warning(level):
     result = build_result("ph", led_state(level), [])
 
     assert result == {
         "level": level,
         "mode": "dosing",
-        "status": "ok",
-        "diagnosis": "Dosing active",
+        "status": "warning",
+        "diagnosis": "Above target",
     }
 
 
@@ -111,4 +111,28 @@ def test_single_blinking_led_is_standby_warning_for_both_devices(
         "mode": "standby",
         "status": "warning",
         "diagnosis": diagnosis,
+    }
+
+
+@pytest.mark.parametrize("device", ["chlorine", "ph"])
+def test_led_1_and_7_blinking_is_standby_warning(device):
+    result = build_result(device, [False] * 7, [1, 7])
+
+    assert result == {
+        "level": 1 if device == "chlorine" else None,
+        "mode": "standby",
+        "status": "warning",
+        "diagnosis": "Low (Standby)",
+    }
+
+
+@pytest.mark.parametrize("device", ["chlorine", "ph"])
+def test_timeout_pattern_is_error(device):
+    result = build_result(device, [False] * 7, [1, 2, 3, 5, 6, 7])
+
+    assert result == {
+        "level": None,
+        "mode": "error",
+        "status": "error",
+        "diagnosis": "Time-out (dosing stopped)",
     }

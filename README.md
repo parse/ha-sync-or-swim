@@ -34,6 +34,17 @@ The repository's validation workflow runs:
 2. Install the "SyncOrSwim" integration.
 3. Restart Home Assistant.
 
+### Migrating from Pahlen Monitor
+The Home Assistant integration domain changed from `pahlen_monitor` to
+`sync_or_swim`. Existing Home Assistant entities from the old integration are
+not preserved.
+
+1. Delete the old "Pahlen Monitor" integration entry from Home Assistant.
+2. Restart Home Assistant.
+3. Install or update this repository through HACS.
+4. Add a new "SyncOrSwim" integration entry and reselect the camera, light,
+   shared sensors, backend URL, token, and installation ID.
+
 ## Backend Flow
 - Producers send data to the backend via analysis bursts or direct sensor pushes.
 - Consumers poll the latest state for an installation ID.

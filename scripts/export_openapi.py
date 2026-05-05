@@ -14,7 +14,7 @@ DEFAULT_OUTPUT = REPO_ROOT / "openapi.json"
 def export_openapi(output: Path) -> None:
     """Export the FastAPI OpenAPI schema without requiring production settings."""
 
-    os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/pahlen-monitor-openapi.db")
+    os.environ.setdefault("DATABASE_URL", "sqlite:////tmp/sync-or-swim-openapi.db")
     sys.path.insert(0, str(BACKEND_SRC))
 
     from main import app

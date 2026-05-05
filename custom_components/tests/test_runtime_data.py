@@ -86,6 +86,9 @@ def stub_modules():
         content = b""
         content_type = "image/jpeg"
 
+    class StubSensorDeviceClass:
+        TIMESTAMP = "timestamp"
+
     class StubDataUpdateCoordinator:
         @classmethod
         def __class_getitem__(cls, item):
@@ -103,6 +106,7 @@ def stub_modules():
         return_value=StubCameraImage()
     )
     modules["homeassistant.components.sensor"].SensorEntity = object
+    modules["homeassistant.components.sensor"].SensorDeviceClass = StubSensorDeviceClass
     modules["homeassistant.components.binary_sensor"].BinarySensorEntity = object
     modules[
         "homeassistant.components.binary_sensor"

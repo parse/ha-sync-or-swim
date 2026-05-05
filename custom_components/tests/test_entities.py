@@ -4,6 +4,7 @@ import types
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -259,3 +260,84 @@ def test_button_name_is_sync_or_swim_prefixed():
     analyze = button.SyncOrSwimAnalyzeButton(coordinator, entry)
 
     assert analyze._attr_name == "SyncOrSwim Analyze Now"
+
+
+@pytest.mark.asyncio
+async def test_producer_controls_reflect_installation_enabled_state():
+    button = load_module("button")
+    switch = load_module("switch")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
+    coordinator = SimpleNamespace(
+        data=coordinator_data(installation_enabled=True),
+        installation_enabled=True,
+        async_fetch_latest=AsyncMock(),
+        async_set_installation_enabled=AsyncMock(),
+    )
+    entry.runtime_data = coordinator
+
+    fetch_latest = button.SyncOrSwimFetchLatestButton(coordinator, entry)
+    installation_enabled = switch.SyncOrSwimInstallationEnabledSwitch(
+        coordinator, entry
+    )
+
+    assert fetch_latest._attr_name == "SyncOrSwim Fetch Latest"
+    assert fetch_latest.available is True
+    assert installation_enabled._attr_name == "SyncOrSwim Installation Enabled"
+    assert installation_enabled.is_on is True
+
+    await fetch_latest.async_press()
+    await installation_enabled.async_turn_off()
+
+    coordinator.async_fetch_latest.assert_awaited_once()
+    coordinator.async_set_installation_enabled.assert_awaited_once_with(False)
+
+
+def test_disabled_installation_keeps_data_non_problematic_and_buttons_offline():
+    binary_sensor = load_module("binary_sensor")
+    button = load_module("button")
+    switch = load_module("switch")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
+    coordinator = SimpleNamespace(
+        installation_enabled=False,
+        data=coordinator_data(
+            installation_enabled=False,
+            pool={
+                "chlorine": {"status": "ok"},
+                "ph": {"status": "ok"},
+            },
+            stale=False,
+        ),
+    )
+    entry.runtime_data = coordinator
+
+    problem = binary_sensor.SyncOrSwimProblemSensor(coordinator, entry)
+    analyze = button.SyncOrSwimAnalyzeButton(coordinator, entry)
+    fetch_latest = button.SyncOrSwimFetchLatestButton(coordinator, entry)
+    installation_enabled = switch.SyncOrSwimInstallationEnabledSwitch(
+        coordinator, entry
+    )
+
+    assert problem.is_on is False
+    assert analyze.available is False
+    assert fetch_latest.available is False
+    assert installation_enabled.is_on is False
+
+
+@pytest.mark.asyncio
+async def test_consumer_gets_no_producer_controls():
+    button = load_module("button")
+    switch = load_module("switch")
+    entry = SimpleNamespace(
+        entry_id="entry-1",
+        data={"role": "consumer"},
+        runtime_data=SimpleNamespace(),
+    )
+    coordinator = SimpleNamespace(data=coordinator_data())
+    entry.runtime_data = coordinator
+    hass = SimpleNamespace(data={})
+    entities = []
+
+    await button.async_setup_entry(hass, entry, entities.extend)
+    await switch.async_setup_entry(hass, entry, entities.extend)
+
+    assert entities == []

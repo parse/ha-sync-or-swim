@@ -1,8 +1,20 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from db.migrations import migrate_shared_sensors_table
+from db.session import engine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import analyze, debug, installations, latest
 
-app = FastAPI(title="SyncOrSwim", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    migrate_shared_sensors_table(engine)
+    yield
+
+
+app = FastAPI(title="SyncOrSwim", version="1.0.0", lifespan=lifespan)
 
 
 app.add_middleware(

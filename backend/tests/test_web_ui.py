@@ -12,7 +12,11 @@ def test_root_serves_web_ui():
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     assert "text/html" in response.headers["content-type"]
-    assert "SyncOrSwim Shared Sensors" in response.text
+    assert "SyncOrSwim" in response.text
+    assert "Shared Sensors" in response.text
+    assert "Clear saved access" in response.text
+    assert "updateAccessView" in response.text
+    assert "removeItem" in response.text
     assert 'href="/static/ui.css"' in response.text
     assert "/api/installations/" in response.text
     assert "htmx.org@2.0.10" in response.text
@@ -38,7 +42,8 @@ def test_static_css_is_served():
 
     assert response.status_code == 200
     assert "text/css" in response.headers["content-type"]
-    assert "SyncOrSwim" not in response.text
+    assert "page-header" in response.text
+    assert "secondary-button" in response.text
     assert "grid-template-columns" in response.text
 
 

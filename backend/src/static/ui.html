@@ -9,10 +9,21 @@
   </head>
   <body>
     <main>
-      <h1>SyncOrSwim Shared Sensors</h1>
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">SyncOrSwim</p>
+          <h1>Shared Sensors</h1>
+        </div>
+        <button id="clear-access" class="secondary-button" type="button" hidden>
+          Clear saved access
+        </button>
+      </header>
+
+      <p id="access-summary" class="access-summary" hidden></p>
 
       <form
         id="sensor-form"
+        class="access-form"
         hx-get="/api/installations/sensors/latest-fragment"
         hx-target="#sensors-panel"
         hx-swap="innerHTML"
@@ -59,6 +70,8 @@
       const installationInput = document.querySelector("#installation-id");
       const tokenInput = document.querySelector("#web-token");
       const sensorsPanel = document.querySelector("#sensors-panel");
+      const accessSummary = document.querySelector("#access-summary");
+      const clearAccessButton = document.querySelector("#clear-access");
       const params = new URLSearchParams(window.location.search);
 
       installationInput.value =
@@ -75,8 +88,36 @@
         localStorage.setItem("syncorswim.webToken", tokenInput.value);
       }
 
+      function hasSavedAccess() {
+        return Boolean(installationInput.value.trim() && tokenInput.value);
+      }
+
+      function updateAccessView() {
+        const hasAccess = hasSavedAccess();
+        form.hidden = hasAccess;
+        accessSummary.hidden = !hasAccess;
+        clearAccessButton.hidden = !hasAccess;
+
+        if (hasAccess) {
+          accessSummary.textContent = `Showing ${installationInput.value.trim()}`;
+        }
+      }
+
       form.addEventListener("submit", () => {
         storeFormValues();
+        updateAccessView();
+      });
+
+      clearAccessButton.addEventListener("click", () => {
+        localStorage.removeItem("syncorswim.installationId");
+        localStorage.removeItem("syncorswim.webToken");
+        installationInput.value = "";
+        tokenInput.value = "";
+        accessSummary.textContent = "";
+        sensorsPanel.innerHTML =
+          '<p class="status">Enter an installation ID and token to load sensors.</p><table><tbody><tr><td>Enter an installation ID and token to load sensors.</td></tr></tbody></table>';
+        updateAccessView();
+        installationInput.focus();
       });
 
       document.body.addEventListener("htmx:configRequest", (event) => {
@@ -123,6 +164,7 @@
         }
 
         storeFormValues();
+        updateAccessView();
         htmx.ajax(
           "GET",
           `/api/installations/sensors/latest-fragment?installation_id=${encodeURIComponent(installationInput.value.trim())}`,
@@ -135,6 +177,7 @@
       }
 
       document.addEventListener("DOMContentLoaded", () => {
+        updateAccessView();
         window.setTimeout(loadSavedSensors, 0);
       });
     </script>

@@ -16,16 +16,40 @@ main {
   box-sizing: border-box;
   width: min(960px, 100%);
   margin: 0 auto;
-  padding: 32px 20px;
+  padding: 28px 20px;
+}
+
+.page-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 3px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 h1 {
-  margin: 0 0 20px;
-  font-size: 28px;
+  margin: 0;
+  font-size: 30px;
   font-weight: 700;
+  line-height: 1.15;
 }
 
-form {
+.access-summary {
+  margin: 0 0 16px;
+  color: #475569;
+  font-size: 15px;
+}
+
+.access-form {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
   gap: 12px;
@@ -33,7 +57,13 @@ form {
   margin-bottom: 20px;
 }
 
-label {
+.access-form[hidden],
+.access-summary[hidden],
+.secondary-button[hidden] {
+  display: none;
+}
+
+.access-form label {
   display: grid;
   gap: 5px;
   font-size: 13px;
@@ -68,6 +98,14 @@ button {
 button:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.secondary-button {
+  min-height: 38px;
+  border: 1px solid #c7cfdd;
+  background: #fff;
+  color: #334155;
+  white-space: nowrap;
 }
 
 .status {
@@ -115,8 +153,36 @@ tr:last-child td {
 }
 
 @media (max-width: 700px) {
-  form {
+  main {
+    padding: 20px 14px;
+  }
+
+  .page-header {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  h1 {
+    font-size: 26px;
+  }
+
+  .secondary-button {
+    width: 100%;
+  }
+
+  .access-summary {
+    margin-bottom: 12px;
+  }
+
+  .access-form {
     grid-template-columns: 1fr;
+    margin-bottom: 16px;
+  }
+
+  input,
+  button {
+    min-height: 46px;
   }
 
   table,
@@ -134,11 +200,12 @@ tr:last-child td {
 
   tr {
     border-bottom: 1px solid #e5e7eb;
+    padding: 10px 0;
   }
 
   td {
     border: 0;
-    padding: 8px 12px;
+    padding: 6px 12px;
   }
 
   td::before {
@@ -159,7 +226,8 @@ tr:last-child td {
   }
 
   input,
-  table {
+  table,
+  .secondary-button {
     background: #172033;
     color: #e5e7eb;
   }
@@ -179,7 +247,9 @@ tr:last-child td {
     border-color: #2f3b52;
   }
 
-  .status {
+  .status,
+  .access-summary,
+  .eyebrow {
     color: #cbd5e1;
   }
 

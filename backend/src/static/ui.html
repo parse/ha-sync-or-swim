@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SyncOrSwim Shared Sensors</title>
+    <link rel="stylesheet" href="/static/ui.css">
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
+  </head>
+  <body>
+    <main>
+      <h1>SyncOrSwim Shared Sensors</h1>
+
+      <form
+        id="sensor-form"
+        hx-get="/api/installations/sensors/latest-fragment"
+        hx-target="#sensors-panel"
+        hx-swap="innerHTML"
+        hx-disabled-elt="#refresh"
+      >
+        <label>
+          Installation ID
+          <input
+            id="installation-id"
+            name="installation_id"
+            autocomplete="username"
+            required
+            pattern="[a-z0-9-]{1,64}"
+          >
+        </label>
+        <label>
+          Web UI token
+          <input id="web-token" type="password" autocomplete="current-password" required>
+        </label>
+        <button id="refresh" type="submit">Refresh</button>
+      </form>
+
+      <div id="sensors-panel">
+        <p class="status">Enter an installation ID and token to load sensors.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Sensor</th>
+              <th>Value</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="3">Enter an installation ID and token to load sensors.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+
+    <script>
+      const form = document.querySelector("#sensor-form");
+      const installationInput = document.querySelector("#installation-id");
+      const tokenInput = document.querySelector("#web-token");
+      const sensorsPanel = document.querySelector("#sensors-panel");
+
+      installationInput.value = localStorage.getItem("syncorswim.installationId") || "";
+      tokenInput.value = localStorage.getItem("syncorswim.webToken") || "";
+
+      form.addEventListener("submit", (event) => {
+        localStorage.setItem(
+          "syncorswim.installationId",
+          installationInput.value.trim(),
+        );
+        localStorage.setItem("syncorswim.webToken", tokenInput.value);
+      });
+
+      document.body.addEventListener("htmx:configRequest", (event) => {
+        event.detail.headers.Authorization = `Bearer ${tokenInput.value}`;
+      });
+
+      document.body.addEventListener("htmx:beforeRequest", () => {
+        sensorsPanel.innerHTML =
+          '<p class="status">Loading...</p><table><tbody><tr><td>Loading...</td></tr></tbody></table>';
+      });
+
+      document.body.addEventListener("htmx:responseError", (event) => {
+        const message =
+          event.detail.xhr.status === 401
+            ? "Unauthorized. Check the web UI token."
+            : "Could not load shared sensors.";
+        sensorsPanel.innerHTML = `<p class="status error">${message}</p><table><tbody><tr><td>${message}</td></tr></tbody></table>`;
+      });
+
+      if (installationInput.value && tokenInput.value) {
+        form.requestSubmit();
+      }
+    </script>
+  </body>
+</html>

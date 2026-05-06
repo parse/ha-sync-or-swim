@@ -7,6 +7,7 @@ import pytest
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["PUSH_TOKEN"] = "test-token"
+os.environ["WEB_UI_TOKEN"] = "web-test-token"
 
 from db.models import Base
 from db.session import engine

@@ -15,3 +15,17 @@ def verify_token(authorization: str | None = Header(None)) -> None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
         )
+
+
+def verify_web_ui_token(authorization: str | None = Header(None)) -> None:
+    expected_token = os.environ.get("WEB_UI_TOKEN")
+    if not expected_token:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="WEB_UI_TOKEN not configured on server",
+        )
+
+    if authorization != f"Bearer {expected_token}":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )

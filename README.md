@@ -48,6 +48,10 @@ not preserved.
 ## Backend Flow
 - Producers send data to the backend via analysis bursts or direct sensor pushes.
 - Consumers poll the latest state for an installation ID.
+- The backend serves a small shared-sensors web UI at `/` and `/ui`. Configure
+  `WEB_UI_TOKEN` for this read-only UI; it can only read shared sensors through
+  `/api/installations/{installation_id}/sensors/latest`. The UI uses htmx from
+  jsDelivr and does not require a frontend build step.
 
 ### 2. Configuration
 - **Producer:** Select "Producer". Configure your camera (optional), shared sensors, backend URL, and token.

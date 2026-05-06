@@ -1,10 +1,13 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from db.migrations import migrate_shared_sensors_table
 from db.session import engine
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from routes import analyze, debug, installations, latest
 
 
@@ -36,6 +39,20 @@ app.include_router(
     installations.router, prefix="/api/installations", tags=["installations"]
 )
 app.include_router(analyze.router, prefix="/api/analyze", tags=["analyze"])
+
+STATIC_PATH = Path(__file__).with_name("static")
+UI_PATH = STATIC_PATH / "ui.html"
+app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
+
+
+@app.get("/", include_in_schema=False)
+async def web_ui() -> FileResponse:
+    return FileResponse(UI_PATH, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/ui", include_in_schema=False)
+async def web_ui_alias() -> FileResponse:
+    return FileResponse(UI_PATH, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/health")

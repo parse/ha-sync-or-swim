@@ -14,7 +14,7 @@ class SyncOrSwimConfigEntryData(TypedDict):
     backend_url: str
     push_token: str
     camera_entity: NotRequired[str]
-    light_entity: NotRequired[str]
+    shared_sensors: NotRequired[list[str]]
     scan_interval: NotRequired[int]
     poll_interval: NotRequired[int]
     staleness_threshold: NotRequired[int]
@@ -22,6 +22,11 @@ class SyncOrSwimConfigEntryData(TypedDict):
 
 class SyncOrSwimConfigEntryOptions(TypedDict, total=False):
     installation_enabled: bool
+    shared_sensors: list[str]
+    shared_sensor_intervals: str
+    scan_interval: int
+    poll_interval: int
+    staleness_threshold: int
 
 
 class SyncOrSwimConfigEntry(ConfigEntry):

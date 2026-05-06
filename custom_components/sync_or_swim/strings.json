@@ -11,7 +11,6 @@
         "data": {
           "installation_id": "Installation ID",
           "camera_entity": "Camera entity",
-          "light_entity": "Spotlight entity",
           "push_token": "Push Token",
           "backend_url": "Backend URL",
           "scan_interval": "Scan interval (minutes)",
@@ -27,12 +26,44 @@
           "poll_interval": "Poll interval (minutes)",
           "staleness_threshold": "Staleness threshold (minutes)"
         }
+      },
+      "reconfigure": {
+        "title": "Update connection settings",
+        "data": {
+          "camera_entity": "Camera entity",
+          "push_token": "Push Token",
+          "backend_url": "Backend URL"
+        }
       }
     },
     "error": {
       "cannot_connect": "Cannot connect to backend",
       "invalid_installation_id": "Use only lowercase letters, numbers, and hyphens for the installation ID",
       "invalid_entity": "Entity not found or wrong type",
+      "invalid_shared_sensor_intervals": "Use one entity_id=minutes entry per line",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "reconfigure_successful": "SyncOrSwim configuration updated"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SyncOrSwim options",
+        "data": {
+          "scan_interval": "Scan interval (minutes)",
+          "poll_interval": "Poll interval (minutes)",
+          "staleness_threshold": "Staleness threshold (minutes)",
+          "installation_enabled": "Installation enabled",
+          "shared_sensors": "Sensors to share",
+          "shared_sensor_intervals": "Shared sensor intervals"
+        },
+        "description": "Set shared sensor intervals as one entity_id=minutes entry per line."
+      }
+    },
+    "error": {
+      "invalid_shared_sensor_intervals": "Use one entity_id=minutes entry per line",
       "unknown": "Unexpected error"
     }
   }

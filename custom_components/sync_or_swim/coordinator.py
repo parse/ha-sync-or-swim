@@ -3,21 +3,35 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, cast
+from typing import Any
 
 from homeassistant.components import camera
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api_client import SyncOrSwimApiClient, SyncOrSwimApiNotFound
 from .camera_payload import normalize_camera_payload
+from .config_helpers import (
+    effective_entry_value,
+    effective_shared_sensors,
+    shared_sensor_interval_minutes,
+)
 from .const import (
     BURST_COUNT,
     BURST_INTERVAL_SECONDS,
+    CONF_BACKEND_URL,
+    CONF_CAMERA_ENTITY,
     CONF_INSTALLATION_ENABLED,
-    CONF_SHARED_SENSORS,
+    CONF_POLL_INTERVAL,
+    CONF_PUSH_TOKEN,
+    CONF_SCAN_INTERVAL,
+    CONF_STALENESS_THRESHOLD,
     DEFAULT_INSTALLATION_ENABLED,
+    DEFAULT_POLL_INTERVAL,
+    DEFAULT_SCAN_INTERVAL,
+    DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
     LIGHT_WARMUP_SECONDS,
     STATUS_UNKNOWN,
@@ -98,7 +112,9 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
 
     def __init__(self, hass: HomeAssistant, entry: SyncOrSwimConfigEntry):
         entry_data = entry.data
-        interval_minutes = entry_data["scan_interval"]
+        interval_minutes = effective_entry_value(
+            entry, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+        )
         super().__init__(
             hass,
             logger=_LOGGER,
@@ -108,12 +124,16 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
         self._entry = entry
         self._entry_data = entry_data
         self._installation_id = entry_data["installation_id"]
-        self._staleness_minutes = entry_data["staleness_threshold"]
+        self._staleness_minutes = effective_entry_value(
+            entry, CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD
+        )
+        self._shared_sensor_locks: dict[str, asyncio.Lock] = {}
         self._api_client = SyncOrSwimApiClient(
-            entry_data["backend_url"],
-            entry_data.get("push_token"),
+            effective_entry_value(entry, CONF_BACKEND_URL, entry_data["backend_url"]),
+            effective_entry_value(entry, CONF_PUSH_TOKEN, entry_data.get("push_token")),
             async_get_clientsession(hass),
         )
+        self._setup_shared_sensor_timers()
 
     @property
     def installation_enabled(self) -> bool:
@@ -130,19 +150,14 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
             _LOGGER.debug("Starting producer analysis via backend")
 
             # 1. Capture Images (Burst)
-            camera_entity_id = self._entry_data.get("camera_entity")
-            light_entity_id = self._entry_data.get("light_entity")
-
+            camera_entity_id = effective_entry_value(
+                self._entry, CONF_CAMERA_ENTITY, None
+            )
             if not camera_entity_id:
                 _LOGGER.error(
                     "Camera entity is not configured in integration settings."
                 )
                 raise UpdateFailed("Camera entity is not configured.")
-
-            if not light_entity_id:
-                _LOGGER.warning(
-                    "Light entity is not configured. Proceeding without light control."
-                )
 
             images = []
 
@@ -173,24 +188,7 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
                 self._installation_id, images
             )
 
-            # 3. Push shared sensors if any
-            shared_sensor_entities = cast(
-                list[str], self._entry_data.get(CONF_SHARED_SENSORS, [])
-            )
-            if shared_sensor_entities:
-                _LOGGER.debug("Pushing shared sensors: %s", shared_sensor_entities)
-                sensor_updates = []
-                for entity_id in shared_sensor_entities:
-                    state = self.hass.states.get(entity_id)
-                    sensor_update = shared_sensor_update_from_state(entity_id, state)
-                    if sensor_update:
-                        sensor_updates.append(sensor_update)
-                if sensor_updates:
-                    await self._api_client.push_shared_sensors(
-                        self._installation_id, sensor_updates
-                    )
-
-            # 4. Process results from backend
+            # 3. Process results from backend
             result: SyncOrSwimData = {
                 **remote_data,
                 "stale": False,
@@ -203,6 +201,52 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
         except Exception as exc:
             _LOGGER.exception("Error in producer update")
             raise UpdateFailed(f"Analysis failed: {exc}") from exc
+
+    def _setup_shared_sensor_timers(self) -> None:
+        """Register independent shared sensor push timers."""
+        for entity_id in effective_shared_sensors(self._entry):
+            interval = timedelta(
+                minutes=shared_sensor_interval_minutes(self._entry, entity_id)
+            )
+            self._shared_sensor_locks[entity_id] = asyncio.Lock()
+
+            async def push_shared_sensor(
+                now: datetime, entity_id: str = entity_id
+            ) -> None:
+                await self._async_push_shared_sensor(entity_id)
+
+            self._entry.async_on_unload(
+                async_track_time_interval(self.hass, push_shared_sensor, interval)
+            )
+            task = self.hass.async_create_task(
+                self._async_push_shared_sensor(entity_id)
+            )
+            self._entry.async_on_unload(task.cancel)
+
+    async def _async_push_shared_sensor(self, entity_id: str) -> None:
+        """Push one shared sensor state to the backend."""
+        try:
+            if not self.installation_enabled:
+                _LOGGER.debug(
+                    "Shared sensor push skipped because installation disabled"
+                )
+                return
+
+            lock = self._shared_sensor_locks.setdefault(entity_id, asyncio.Lock())
+            if lock.locked():
+                _LOGGER.debug("Shared sensor push already running for %s", entity_id)
+                return
+
+            async with lock:
+                state = self.hass.states.get(entity_id)
+                sensor_update = shared_sensor_update_from_state(entity_id, state)
+                if not sensor_update:
+                    return
+                await self._api_client.push_shared_sensors(
+                    self._installation_id, [sensor_update]
+                )
+        except Exception:
+            _LOGGER.exception("Error pushing shared sensor %s", entity_id)
 
     async def async_fetch_latest(self) -> None:
         """Fetch the latest backend measurement without taking new camera images."""
@@ -263,7 +307,9 @@ class ConsumerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
 
     def __init__(self, hass: HomeAssistant, entry: SyncOrSwimConfigEntry):
         entry_data = entry.data
-        interval_minutes = entry_data["poll_interval"]
+        interval_minutes = effective_entry_value(
+            entry, CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
+        )
         super().__init__(
             hass,
             logger=_LOGGER,
@@ -273,10 +319,12 @@ class ConsumerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
         self._entry = entry
         self._entry_data = entry_data
         self._installation_id = entry_data["installation_id"]
-        self._staleness_minutes = entry_data["staleness_threshold"]
+        self._staleness_minutes = effective_entry_value(
+            entry, CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD
+        )
         self._api_client = SyncOrSwimApiClient(
-            entry_data["backend_url"],
-            entry_data.get("push_token"),
+            effective_entry_value(entry, CONF_BACKEND_URL, entry_data["backend_url"]),
+            effective_entry_value(entry, CONF_PUSH_TOKEN, entry_data.get("push_token")),
             async_get_clientsession(hass),
         )
 

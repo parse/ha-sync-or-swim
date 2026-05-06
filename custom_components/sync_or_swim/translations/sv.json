@@ -11,7 +11,6 @@
         "data": {
           "installation_id": "Installations-ID",
           "camera_entity": "Kameraentitet",
-          "light_entity": "Spotlightsentitet (kamerans lampa)",
           "shared_sensors": "Sensorer att dela",
           "push_token": "Säkerhetstoken (Push Token)",
           "backend_url": "Backend-URL",
@@ -28,12 +27,44 @@
           "poll_interval": "Uppdateringsintervall (minuter)",
           "staleness_threshold": "Maximal dataålder (minuter)"
         }
+      },
+      "reconfigure": {
+        "title": "Uppdatera anslutningsinställningar",
+        "data": {
+          "camera_entity": "Kameraentitet",
+          "push_token": "Säkerhetstoken (Push Token)",
+          "backend_url": "Backend-URL"
+        }
       }
     },
     "error": {
       "cannot_connect": "Kan inte ansluta till backend",
       "invalid_installation_id": "Använd bara små bokstäver, siffror och bindestreck för installations-ID",
       "invalid_entity": "Entitet hittades inte eller har fel typ",
+      "invalid_shared_sensor_intervals": "Använd en entity_id=minutes-rad per sensor",
+      "unknown": "Oväntat fel"
+    },
+    "abort": {
+      "reconfigure_successful": "SyncOrSwim-konfigurationen har uppdaterats"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SyncOrSwim-alternativ",
+        "description": "Ange delade sensorintervall som en entity_id=minutes-rad per sensor.",
+        "data": {
+          "scan_interval": "Analysintervall (minuter)",
+          "poll_interval": "Uppdateringsintervall (minuter)",
+          "staleness_threshold": "Maximal dataålder (minuter)",
+          "installation_enabled": "Installation aktiverad",
+          "shared_sensors": "Sensorer att dela",
+          "shared_sensor_intervals": "Intervall för delade sensorer"
+        }
+      }
+    },
+    "error": {
+      "invalid_shared_sensor_intervals": "Använd en entity_id=minutes-rad per sensor",
       "unknown": "Oväntat fel"
     }
   }

@@ -47,7 +47,7 @@ HEALTH_URL="http://127.0.0.1:${MAPPED_PORT}/api/health"
 
 echo "Waiting for ${HEALTH_URL}..."
 for _ in $(seq 1 30); do
-  if curl --fail --silent --show-error "$HEALTH_URL" >/dev/null; then
+  if curl --fail --silent "$HEALTH_URL" >/dev/null 2>&1; then
     echo "Docker smoke test passed."
     exit 0
   fi

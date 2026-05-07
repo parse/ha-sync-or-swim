@@ -4,9 +4,9 @@ from pathlib import Path
 
 from db.migrations import migrate_shared_sensors_table
 from db.session import engine
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from routes import analyze, debug, installations, latest
 
@@ -32,6 +32,15 @@ app.include_router(latest.router, prefix="/latest", tags=["latest"])
 app.include_router(latest.router, prefix="/api/latest", tags=["latest"])
 app.include_router(debug.router, prefix="/debug", tags=["debug"])
 app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
+@app.get("/installations/sensors/latest-fragment", include_in_schema=False)
+async def legacy_fragment_redirect(request: Request) -> RedirectResponse:
+    query = request.url.query
+    new_url = "/api/installations/sensors/latest-fragment"
+    if query:
+        new_url += f"?{query}"
+    return RedirectResponse(url=new_url, status_code=308)
+
+
 app.include_router(
     installations.router, prefix="/installations", tags=["installations"]
 )

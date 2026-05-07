@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from routes import analyze, debug, installations, latest
+from routes import analyze, debug, installations, latest, ui
 
 
 @asynccontextmanager
@@ -33,9 +33,18 @@ app.include_router(latest.router, prefix="/api/latest", tags=["latest"])
 app.include_router(debug.router, prefix="/debug", tags=["debug"])
 app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
 @app.get("/installations/sensors/latest-fragment", include_in_schema=False)
-async def legacy_fragment_redirect(request: Request) -> RedirectResponse:
+async def legacy_fragment_redirect_v1(request: Request) -> RedirectResponse:
     query = request.url.query
-    new_url = "/api/installations/sensors/latest-fragment"
+    new_url = "/ui/sensors/latest-fragment"
+    if query:
+        new_url += f"?{query}"
+    return RedirectResponse(url=new_url, status_code=308)
+
+
+@app.get("/api/installations/sensors/latest-fragment", include_in_schema=False)
+async def legacy_fragment_redirect_v2(request: Request) -> RedirectResponse:
+    query = request.url.query
+    new_url = "/ui/sensors/latest-fragment"
     if query:
         new_url += f"?{query}"
     return RedirectResponse(url=new_url, status_code=308)
@@ -48,6 +57,7 @@ app.include_router(
     installations.router, prefix="/api/installations", tags=["installations"]
 )
 app.include_router(analyze.router, prefix="/api/analyze", tags=["analyze"])
+app.include_router(ui.router, prefix="/ui", tags=["ui"])
 
 STATIC_PATH = Path(__file__).with_name("static")
 UI_PATH = STATIC_PATH / "ui.html"

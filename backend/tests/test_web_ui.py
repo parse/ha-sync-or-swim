@@ -18,7 +18,7 @@ def test_root_serves_web_ui():
     assert "updateAccessView" in response.text
     assert "removeItem" in response.text
     assert 'href="/static/ui.css"' in response.text
-    assert "/api/installations/" in response.text
+    assert "/ui/sensors/latest-fragment" in response.text
     assert "htmx.org@2.0.10" in response.text
     assert "/sensors/latest" in response.text
     assert "requestSubmit" not in response.text
@@ -100,7 +100,7 @@ def test_latest_sensors_fragment_returns_sensor_table():
     )
 
     response = client.get(
-        "/api/installations/sensors/latest-fragment",
+        "/ui/sensors/latest-fragment",
         params={"installation_id": "test-installation"},
         headers={"Authorization": "Bearer web-test-token"},
     )
@@ -127,7 +127,7 @@ def test_latest_sensors_fragment_escapes_sensor_values():
     )
 
     response = client.get(
-        "/api/installations/sensors/latest-fragment",
+        "/ui/sensors/latest-fragment",
         params={"installation_id": "test-installation"},
         headers={"Authorization": "Bearer web-test-token"},
     )
@@ -145,7 +145,7 @@ def test_latest_sensors_fragment_rejects_missing_wrong_and_push_tokens():
         {"Authorization": "Bearer test-token"},
     ):
         response = client.get(
-            "/api/installations/sensors/latest-fragment",
+            "/ui/sensors/latest-fragment",
             params={"installation_id": "test-installation"},
             headers=headers,
         )
@@ -155,12 +155,12 @@ def test_latest_sensors_fragment_rejects_missing_wrong_and_push_tokens():
 
 def test_latest_sensors_fragment_returns_ui_errors_as_html():
     bad_id_response = client.get(
-        "/api/installations/sensors/latest-fragment",
+        "/ui/sensors/latest-fragment",
         params={"installation_id": "Bad_Installation"},
         headers={"Authorization": "Bearer web-test-token"},
     )
     missing_response = client.get(
-        "/api/installations/sensors/latest-fragment",
+        "/ui/sensors/latest-fragment",
         params={"installation_id": "unknown-installation"},
         headers={"Authorization": "Bearer web-test-token"},
     )
@@ -231,14 +231,18 @@ def test_latest_sensors_returns_not_found_for_unknown_installation():
     assert response.json()["detail"] == "Installation not found"
 
 
-def test_legacy_fragment_route_redirects_to_api_path():
-    response = client.get(
+def test_legacy_fragment_route_redirects_to_ui_path():
+    for old_path in (
         "/installations/sensors/latest-fragment",
-        params={"installation_id": "test-installation"},
-        follow_redirects=False,
-    )
+        "/api/installations/sensors/latest-fragment",
+    ):
+        response = client.get(
+            old_path,
+            params={"installation_id": "test-installation"},
+            follow_redirects=False,
+        )
 
-    assert response.status_code == 308
-    assert response.headers["location"] == (
-        "/api/installations/sensors/latest-fragment?installation_id=test-installation"
-    )
+        assert response.status_code == 308, f"{old_path} should redirect"
+        assert response.headers["location"] == (
+            "/ui/sensors/latest-fragment?installation_id=test-installation"
+        )

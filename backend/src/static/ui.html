@@ -24,7 +24,7 @@
       <form
         id="sensor-form"
         class="access-form"
-        hx-get="/api/installations/sensors/latest-fragment"
+        hx-get="/ui/sensors/latest-fragment"
         hx-target="#sensors-panel"
         hx-swap="innerHTML"
         hx-disabled-elt="#refresh"
@@ -167,7 +167,7 @@
         updateAccessView();
         htmx.ajax(
           "GET",
-          `/api/installations/sensors/latest-fragment?installation_id=${encodeURIComponent(installationInput.value.trim())}`,
+          `/ui/sensors/latest-fragment?installation_id=${encodeURIComponent(installationInput.value.trim())}`,
           {
             target: "#sensors-panel",
             swap: "innerHTML",

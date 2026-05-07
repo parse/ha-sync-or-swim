@@ -27,6 +27,12 @@ main {
   margin-bottom: 16px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .eyebrow {
   margin: 0 0 3px;
   color: #64748b;
@@ -59,6 +65,7 @@ h1 {
 
 .access-form[hidden],
 .access-summary[hidden],
+.header-actions button[hidden],
 .secondary-button[hidden] {
   display: none;
 }
@@ -106,6 +113,61 @@ button:disabled {
   background: #fff;
   color: #334155;
   white-space: nowrap;
+}
+
+dialog {
+  width: min(420px, calc(100% - 32px));
+  border: 0;
+  border-radius: 8px;
+  padding: 20px;
+  background: #fff;
+  color: #18202f;
+  box-shadow: 0 18px 48px rgb(15 23 42 / 30%);
+}
+
+dialog::backdrop {
+  background: rgb(15 23 42 / 55%);
+}
+
+.share-dialog-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.dialog-close {
+  min-height: 36px;
+}
+
+.qr-code {
+  display: grid;
+  place-items: center;
+  margin: 0 auto 14px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.qr-code svg {
+  display: block;
+  width: min(280px, 100%);
+  height: auto;
+}
+
+.share-installation {
+  margin: 0;
+  color: #475569;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .status {
@@ -163,12 +225,27 @@ tr:last-child td {
     margin-bottom: 14px;
   }
 
+  .header-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
   h1 {
     font-size: 26px;
   }
 
-  .secondary-button {
+  .secondary-button,
+  .header-actions {
     width: 100%;
+  }
+
+  dialog {
+    padding: 16px;
+  }
+
+  .share-dialog-header {
+    display: grid;
+    gap: 12px;
   }
 
   .access-summary {
@@ -227,6 +304,7 @@ tr:last-child td {
 
   input,
   table,
+  dialog,
   .secondary-button {
     background: #172033;
     color: #e5e7eb;
@@ -243,12 +321,18 @@ tr:last-child td {
 
   th,
   td,
-  tr {
+  tr,
+  .qr-code {
     border-color: #2f3b52;
+  }
+
+  .qr-code {
+    background: #fff;
   }
 
   .status,
   .access-summary,
+  .share-installation,
   .eyebrow {
     color: #cbd5e1;
   }

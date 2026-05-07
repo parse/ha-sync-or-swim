@@ -15,10 +15,19 @@ def test_root_serves_web_ui():
     assert "SyncOrSwim" in response.text
     assert "Shared Sensors" in response.text
     assert "Clear saved access" in response.text
+    assert "Share access" in response.text
+    assert 'id="share-dialog"' in response.text
     assert "updateAccessView" in response.text
+    assert "persistIncomingAccessFromUrl" in response.text
     assert "removeItem" in response.text
+    assert 'params.get("web_token")' in response.text
+    assert 'localStorage.setItem("syncorswim.webToken"' in response.text
+    assert 'cleanUrl.searchParams.delete("web_token")' in response.text
+    assert "history.replaceState" in response.text
     assert 'href="/static/ui.css"' in response.text
     assert "/ui/sensors/latest-fragment" in response.text
+    assert "/ui/share-qr-fragment" in response.text
+    assert 'hx-target="#share-dialog-content"' in response.text
     assert "htmx.org@2.0.10" in response.text
     assert "/sensors/latest" in response.text
     assert "requestSubmit" not in response.text
@@ -44,7 +53,51 @@ def test_static_css_is_served():
     assert "text/css" in response.headers["content-type"]
     assert "page-header" in response.text
     assert "secondary-button" in response.text
+    assert "share-dialog-header" in response.text
+    assert "qr-code" in response.text
     assert "grid-template-columns" in response.text
+
+
+def test_share_qr_fragment_returns_qr_code():
+    response = client.get(
+        "/ui/share-qr-fragment",
+        params={"installation_id": "test-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "<svg" in response.text
+    assert "path" in response.text
+    assert "test-installation" in response.text
+    assert "Installation ID:" in response.text
+    assert "web-test-token" not in response.text
+
+
+def test_share_qr_fragment_rejects_missing_wrong_and_push_tokens():
+    for headers in (
+        {},
+        {"Authorization": "Bearer wrong-token"},
+        {"Authorization": "Bearer test-token"},
+    ):
+        response = client.get(
+            "/ui/share-qr-fragment",
+            params={"installation_id": "test-installation"},
+            headers=headers,
+        )
+
+        assert response.status_code == 401
+
+
+def test_share_qr_fragment_returns_ui_error_for_bad_installation_id():
+    response = client.get(
+        "/ui/share-qr-fragment",
+        params={"installation_id": "Bad_Installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "Invalid installation ID" in response.text
 
 
 def test_latest_sensors_accepts_web_ui_token():

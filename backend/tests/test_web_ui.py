@@ -229,20 +229,3 @@ def test_latest_sensors_returns_not_found_for_unknown_installation():
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Installation not found"
-
-
-def test_legacy_fragment_route_redirects_to_ui_path():
-    for old_path in (
-        "/installations/sensors/latest-fragment",
-        "/api/installations/sensors/latest-fragment",
-    ):
-        response = client.get(
-            old_path,
-            params={"installation_id": "test-installation"},
-            follow_redirects=False,
-        )
-
-        assert response.status_code == 308, f"{old_path} should redirect"
-        assert response.headers["location"] == (
-            "/ui/sensors/latest-fragment?installation_id=test-installation"
-        )

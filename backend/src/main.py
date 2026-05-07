@@ -32,22 +32,24 @@ app.include_router(latest.router, prefix="/latest", tags=["latest"])
 app.include_router(latest.router, prefix="/api/latest", tags=["latest"])
 app.include_router(debug.router, prefix="/debug", tags=["debug"])
 app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
-@app.get("/installations/sensors/latest-fragment", include_in_schema=False)
-async def legacy_fragment_redirect_v1(request: Request) -> RedirectResponse:
+
+
+def _fragment_redirect(request: Request) -> RedirectResponse:
     query = request.url.query
     new_url = "/ui/sensors/latest-fragment"
     if query:
         new_url += f"?{query}"
     return RedirectResponse(url=new_url, status_code=308)
+
+
+@app.get("/installations/sensors/latest-fragment", include_in_schema=False)
+async def legacy_fragment_redirect_v1(request: Request) -> RedirectResponse:
+    return _fragment_redirect(request)
 
 
 @app.get("/api/installations/sensors/latest-fragment", include_in_schema=False)
 async def legacy_fragment_redirect_v2(request: Request) -> RedirectResponse:
-    query = request.url.query
-    new_url = "/ui/sensors/latest-fragment"
-    if query:
-        new_url += f"?{query}"
-    return RedirectResponse(url=new_url, status_code=308)
+    return _fragment_redirect(request)
 
 
 app.include_router(

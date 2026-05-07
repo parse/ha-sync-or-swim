@@ -46,3 +46,23 @@ jobs:
 
       - name: Run validation script
         run: bash scripts/validate_python.sh
+
+  docker-build-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check backend changes
+        id: backend-changes
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" | grep -q '^backend/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and smoke test Docker image
+        if: steps.backend-changes.outputs.changed == 'true'
+        run: bash scripts/validate_docker.sh

@@ -1,4 +1,4 @@
-from db.models import Installation
+from db.models import Installation, SharedSensor
 from db.session import SessionLocal
 from fastapi.testclient import TestClient
 from main import app
@@ -127,6 +127,7 @@ def test_latest_sensors_accepts_web_ui_token():
         {
             "key": "sensor.cellar_temperature",
             "label": "Cellar temperature",
+            "preferred_alias": None,
             "value": "12.3",
             "unit": "C",
             "device_class": "temperature",
@@ -164,6 +165,69 @@ def test_latest_sensors_fragment_returns_sensor_table():
     assert "12.3 C" in response.text
     assert "<time datetime=" in response.text
     assert "+00:00" in response.text
+
+
+def test_latest_sensors_use_preferred_alias_when_set_manually():
+    sensor_response = client.post(
+        "/api/installations/test-installation/sensors",
+        headers={"Authorization": "Bearer test-token"},
+        json=[
+            {
+                "key": "sensor.cellar_temperature",
+                "label": "Cellar temperature",
+                "value": "12.3",
+            }
+        ],
+    )
+    assert sensor_response.status_code == 200
+
+    with SessionLocal() as db:
+        sensor = (
+            db.query(SharedSensor)
+            .filter(SharedSensor.key == "sensor.cellar_temperature")
+            .one()
+        )
+        sensor.preferred_alias = "Pool temperature"
+        db.commit()
+
+    response = client.get(
+        "/api/installations/test-installation/sensors/latest",
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+    assert response.status_code == 200
+    sensor_payload = response.json()[0]
+    assert sensor_payload.pop("updated_at") is not None
+    assert sensor_payload == {
+        "key": "sensor.cellar_temperature",
+        "label": "Pool temperature",
+        "preferred_alias": "Pool temperature",
+        "value": "12.3",
+        "unit": None,
+        "device_class": None,
+        "state_class": None,
+    }
+
+    disabled_response = client.post(
+        "/api/installations/test-installation/disabled",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert disabled_response.status_code == 200
+    latest = client.get(
+        "/api/latest/test-installation",
+        headers={"Authorization": "Bearer test-token"},
+    )
+    assert latest.status_code == 200
+    assert latest.json()["sensors"][0]["label"] == "Pool temperature"
+    assert latest.json()["sensors"][0]["preferred_alias"] == "Pool temperature"
+
+    fragment = client.get(
+        "/ui/sensors/latest-fragment",
+        params={"installation_id": "test-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+    assert fragment.status_code == 200
+    assert "Pool temperature" in fragment.text
+    assert "Cellar temperature" not in fragment.text
 
 
 def test_latest_sensors_fragment_escapes_sensor_values():

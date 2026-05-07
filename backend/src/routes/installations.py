@@ -5,7 +5,11 @@ from auth import verify_token, verify_web_ui_token
 from db.models import Installation, SharedSensor
 from db.session import get_db
 from fastapi import APIRouter, Depends, HTTPException
-from measurement_service import store_disabled_measurement, store_shared_sensors
+from measurement_service import (
+    shared_sensor_display_label,
+    store_disabled_measurement,
+    store_shared_sensors,
+)
 from schemas.models import (
     InstallationResponseSchema,
     LatestMeasurementSchema,
@@ -22,7 +26,8 @@ router = APIRouter()
 def shared_sensor_schema_from_model(sensor: SharedSensor) -> SharedSensorSchema:
     return SharedSensorSchema(
         key=sensor.key,
-        label=sensor.label,
+        label=shared_sensor_display_label(sensor),
+        preferred_alias=sensor.preferred_alias,
         value=sensor.value,
         unit=sensor.unit,
         device_class=sensor.device_class,
@@ -34,11 +39,14 @@ def shared_sensor_schema_from_model(sensor: SharedSensor) -> SharedSensorSchema:
 def latest_sensors_for_installation(
     db: Session, installation_id: str
 ) -> list[SharedSensor]:
-    return (
+    sensors = (
         db.query(SharedSensor)
         .filter(SharedSensor.installation_id == installation_id)
-        .order_by(SharedSensor.label, SharedSensor.key)
+        .order_by(SharedSensor.key)
         .all()
+    )
+    return sorted(
+        sensors, key=lambda sensor: (shared_sensor_display_label(sensor), sensor.key)
     )
 
 
@@ -76,7 +84,8 @@ def render_sensors_fragment(sensors: list[SharedSensor]) -> str:
         )
         rows.append(
             "<tr>"
-            f'<td data-label="Sensor">{escape(sensor.label or sensor.key)}</td>'
+            f'<td data-label="Sensor">'
+            f"{escape(shared_sensor_display_label(sensor))}</td>"
             f'<td data-label="Value" class="value">{escape(value)}</td>'
             f'<td data-label="Updated">{updated}</td>'
             "</tr>"

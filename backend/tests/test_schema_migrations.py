@@ -3,7 +3,7 @@ from db.models import Measurement, SharedSensor
 from db.session import engine
 from fastapi.testclient import TestClient
 from main import app
-from sqlalchemy import inspect
+from sqlalchemy import Column, DateTime, MetaData, String, Table, inspect
 
 client = TestClient(app)
 
@@ -47,6 +47,7 @@ def test_shared_sensors_migration_updates_existing_schema():
         {
             "key": "sensor.cellar_temperature",
             "label": "Cellar temperature",
+            "preferred_alias": None,
             "value": "12.3",
             "unit": "C",
             "device_class": "temperature",
@@ -56,3 +57,33 @@ def test_shared_sensors_migration_updates_existing_schema():
     ]
 
     assert inspect(engine).has_table(Measurement.__tablename__)
+
+
+def test_shared_sensors_migration_adds_preferred_alias_to_existing_table():
+    SharedSensor.__table__.drop(bind=engine)
+    metadata = MetaData()
+    Table(
+        SharedSensor.__tablename__,
+        metadata,
+        Column("id", String, primary_key=True),
+        Column("installation_id", String, nullable=False),
+        Column("key", String, nullable=False),
+        Column("label", String, nullable=False),
+        Column("value", String, nullable=False),
+        Column("unit", String, nullable=True),
+        Column("device_class", String, nullable=True),
+        Column("state_class", String, nullable=True),
+        Column("updated_at", DateTime(timezone=True), nullable=False),
+    )
+    metadata.create_all(bind=engine)
+    assert "preferred_alias" not in {
+        column["name"]
+        for column in inspect(engine).get_columns(SharedSensor.__tablename__)
+    }
+
+    migrate_shared_sensors_table(engine)
+
+    assert "preferred_alias" in {
+        column["name"]
+        for column in inspect(engine).get_columns(SharedSensor.__tablename__)
+    }

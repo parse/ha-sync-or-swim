@@ -34,6 +34,7 @@ class SharedSensor(Base):
     )
     key: Mapped[str] = mapped_column(String, nullable=False)
     label: Mapped[str] = mapped_column(String, nullable=False)
+    preferred_alias: Mapped[str | None] = mapped_column(String, nullable=True)
     value: Mapped[str] = mapped_column(String, nullable=False)
     unit: Mapped[str | None] = mapped_column(String, nullable=True)
     device_class: Mapped[str | None] = mapped_column(String, nullable=True)

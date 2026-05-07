@@ -20,6 +20,7 @@ class SharedSensorSchema(TypedDict):
     device_class: NotRequired[str | None]
     key: str
     label: str
+    preferred_alias: NotRequired[str | None]
     state_class: NotRequired[str | None]
     unit: NotRequired[str | None]
     updated_at: NotRequired[str | None]

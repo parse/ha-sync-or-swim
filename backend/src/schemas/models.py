@@ -39,6 +39,7 @@ class UnitAnalysis(BaseModel):
 class SharedSensorSchema(BaseModel):
     key: str
     label: str
+    preferred_alias: str | None = None
     value: str
     unit: str | None = None
     device_class: str | None = None

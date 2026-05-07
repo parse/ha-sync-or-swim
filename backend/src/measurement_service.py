@@ -60,11 +60,16 @@ def latest_schema_from_measurement(
 ) -> LatestMeasurementSchema:
     sensor_schemas = []
     if sensors:
-        for s in sensors:
+        sorted_sensors = sorted(
+            sensors,
+            key=lambda sensor: (shared_sensor_display_label(sensor), sensor.key),
+        )
+        for s in sorted_sensors:
             sensor_schemas.append(
                 SharedSensorSchema(
                     key=s.key,
-                    label=s.label,
+                    label=shared_sensor_display_label(s),
+                    preferred_alias=s.preferred_alias,
                     value=s.value,
                     unit=s.unit,
                     device_class=s.device_class,
@@ -102,6 +107,12 @@ def latest_schema_from_measurement(
         sensors=sensor_schemas,
         raw_response=measurement.raw_response,
     )
+
+
+def shared_sensor_display_label(sensor: SharedSensor) -> str:
+    preferred_alias = sensor.preferred_alias.strip() if sensor.preferred_alias else ""
+    label = sensor.label.strip() if sensor.label else ""
+    return preferred_alias or label or sensor.key
 
 
 def store_cv_result(

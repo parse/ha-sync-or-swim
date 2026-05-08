@@ -141,6 +141,19 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
             "installation_enabled", DEFAULT_INSTALLATION_ENABLED
         )
 
+    def _existing_data_with_error(self, exc: Exception) -> SyncOrSwimData | None:
+        existing_data = getattr(self, "data", None)
+        if not existing_data:
+            return None
+
+        return {
+            **existing_data,
+            "stale": compute_stale(
+                existing_data.get("captured_at"), self._staleness_minutes
+            ),
+            "error": str(exc),
+        }
+
     async def _async_update_data(self) -> SyncOrSwimData:
         try:
             if not self.installation_enabled:
@@ -200,6 +213,10 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
 
         except Exception as exc:
             _LOGGER.exception("Error in producer update")
+            fallback_data = self._existing_data_with_error(exc)
+            if fallback_data is not None:
+                _LOGGER.debug("Keeping previous producer data after failed update")
+                return fallback_data
             raise UpdateFailed(f"Analysis failed: {exc}") from exc
 
     def _setup_shared_sensor_timers(self) -> None:

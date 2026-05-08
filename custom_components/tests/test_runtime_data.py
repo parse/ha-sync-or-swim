@@ -831,6 +831,42 @@ async def test_producer_analysis_no_longer_pushes_shared_sensors(monkeypatch):
     assert clients[0].shared_sensor_calls == []
 
 
+@pytest.mark.asyncio
+async def test_producer_update_keeps_existing_data_on_analysis_error(monkeypatch):
+    coordinator = load_module("coordinator")
+    install_fake_api(monkeypatch, coordinator)
+    entry = producer_entry()
+    producer = coordinator.ProducerCoordinator(make_hass(), entry)
+    existing_data = coordinator.unknown_data()
+    existing_data.update(
+        {
+            "installation_id": "pool-1",
+            "captured_at": "2099-01-01T00:00:00Z",
+        }
+    )
+    producer.data = existing_data
+    producer._api_client.analyze_burst = AsyncMock(side_effect=RuntimeError("boom"))
+
+    result = await producer._async_update_data()
+
+    assert result["installation_id"] == "pool-1"
+    assert result["captured_at"] == "2099-01-01T00:00:00Z"
+    assert result["error"] == "boom"
+    assert result["pool"] == existing_data["pool"]
+
+
+@pytest.mark.asyncio
+async def test_producer_update_raises_when_no_existing_data(monkeypatch):
+    coordinator = load_module("coordinator")
+    install_fake_api(monkeypatch, coordinator)
+    entry = producer_entry()
+    producer = coordinator.ProducerCoordinator(make_hass(), entry)
+    producer._api_client.analyze_burst = AsyncMock(side_effect=RuntimeError("boom"))
+
+    with pytest.raises(Exception, match="Analysis failed: boom"):
+        await producer._async_update_data()
+
+
 def test_consumer_poll_interval_prefers_options(monkeypatch):
     coordinator = load_module("coordinator")
     install_fake_api(monkeypatch, coordinator)

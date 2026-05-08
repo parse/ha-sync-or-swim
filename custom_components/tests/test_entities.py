@@ -133,6 +133,7 @@ async def test_sensor_setup_creates_sync_or_swim_detail_entities_without_action_
 
     names = [entity._attr_name for entity in entities]
     assert names == [
+        "SyncOrSwim Dosing Problem",
         "SyncOrSwim Last Calibration Read",
         "SyncOrSwim Free Chlorine Status",
         "SyncOrSwim Free Chlorine Summary",
@@ -224,9 +225,32 @@ def test_led_sensor_formats_solid_and_blinking_leds(
     ("data", "expected"),
     [
         ({}, None),
-        (coordinator_data(pool={"chlorine": {"status": "unknown"}}, stale=True), None),
-        (coordinator_data(), True),
-        (coordinator_data(stale=True), True),
+        (
+            coordinator_data(pool={"chlorine": {"status": "unknown"}}, stale=False),
+            None,
+        ),
+        (coordinator_data(), "Warning"),
+        (
+            coordinator_data(
+                pool={
+                    "chlorine": {"status": "error"},
+                    "ph": {"status": "ok"},
+                },
+                stale=False,
+            ),
+            "Error",
+        ),
+        (
+            coordinator_data(
+                pool={
+                    "chlorine": {"status": "ok"},
+                    "ph": {"status": "error"},
+                },
+                stale=False,
+            ),
+            "Error",
+        ),
+        (coordinator_data(stale=True), "Warning"),
         (
             coordinator_data(
                 pool={
@@ -235,20 +259,20 @@ def test_led_sensor_formats_solid_and_blinking_leds(
                 },
                 stale=False,
             ),
-            False,
+            "OK",
         ),
     ],
 )
 def test_problem_sensor_state_matrix(data, expected):
-    binary_sensor = load_module("binary_sensor")
+    sensor = load_module("sensor")
     entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
     coordinator = SimpleNamespace(data=data)
     entry.runtime_data = coordinator
 
-    problem = binary_sensor.SyncOrSwimProblemSensor(coordinator, entry)
+    problem = sensor.SyncOrSwimProblemSensor(coordinator, entry)
 
     assert problem._attr_name == "SyncOrSwim Dosing Problem"
-    assert problem.is_on is expected
+    assert problem.native_value == expected
 
 
 def test_button_name_is_sync_or_swim_prefixed():
@@ -343,7 +367,7 @@ async def test_producer_controls_reflect_installation_enabled_state():
 
 
 def test_disabled_installation_keeps_data_non_problematic_and_buttons_offline():
-    binary_sensor = load_module("binary_sensor")
+    sensor = load_module("sensor")
     button = load_module("button")
     switch = load_module("switch")
     entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
@@ -360,14 +384,14 @@ def test_disabled_installation_keeps_data_non_problematic_and_buttons_offline():
     )
     entry.runtime_data = coordinator
 
-    problem = binary_sensor.SyncOrSwimProblemSensor(coordinator, entry)
+    problem = sensor.SyncOrSwimProblemSensor(coordinator, entry)
     analyze = button.SyncOrSwimAnalyzeButton(coordinator, entry)
     fetch_latest = button.SyncOrSwimFetchLatestButton(coordinator, entry)
     installation_enabled = switch.SyncOrSwimInstallationEnabledSwitch(
         coordinator, entry
     )
 
-    assert problem.is_on is False
+    assert problem.native_value == "OK"
     assert analyze.available is False
     assert fetch_latest.available is False
     assert installation_enabled.is_on is False

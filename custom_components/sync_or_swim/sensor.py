@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import STATUS_ERROR, STATUS_OK, STATUS_UNKNOWN, STATUS_WARNING
 from .entry_types import SyncOrSwimConfigEntry, require_runtime_coordinator
 
 if TYPE_CHECKING:
@@ -17,6 +18,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 UnitName = Literal["chlorine", "ph"]
+DOSING_PROBLEM_OK = "OK"
+DOSING_PROBLEM_WARNING = "Warning"
+DOSING_PROBLEM_ERROR = "Error"
 INVALID_SHARED_SENSOR_VALUES = {"unknown", "unavailable"}
 GENERIC_SHARED_SENSOR_LABELS = {
     "battery",
@@ -38,7 +42,8 @@ async def async_setup_entry(
     coordinator = require_runtime_coordinator(entry)
 
     entities: list[SensorEntity] = [
-        SyncOrSwimLastCalibrationReadSensor(coordinator, entry)
+        SyncOrSwimProblemSensor(coordinator, entry),
+        SyncOrSwimLastCalibrationReadSensor(coordinator, entry),
     ]
     for unit in ("chlorine", "ph"):
         name_prefix = "Free Chlorine" if unit == "chlorine" else "pH"
@@ -125,6 +130,69 @@ class SyncOrSwimSharedSensor(CoordinatorEntity, SensorEntity):
                     "original_label": s.get("label"),
                 }
         return {}
+
+
+class SyncOrSwimProblemSensor(CoordinatorEntity, SensorEntity):
+    _attr_icon = "mdi:alert-circle-outline"
+    _attr_name = "SyncOrSwim Dosing Problem"
+
+    def __init__(
+        self, coordinator: SyncOrSwimCoordinator, entry: SyncOrSwimConfigEntry
+    ) -> None:
+        super().__init__(coordinator)
+        self._coordinator = coordinator
+        self._attr_unique_id = f"{entry.entry_id}_problem"
+
+    @property
+    def native_value(self) -> str | None:
+        data = self._coordinator.data
+        if not data:
+            return None
+
+        pool = data.get("pool")
+        if not pool:
+            return DOSING_PROBLEM_WARNING if data.get("stale", False) else None
+
+        chlorine_status = pool.get("chlorine", {}).get("status")
+        ph_status = pool.get("ph", {}).get("status")
+        statuses = (chlorine_status, ph_status)
+
+        if STATUS_ERROR in statuses:
+            return DOSING_PROBLEM_ERROR
+
+        if STATUS_WARNING in statuses or data.get("stale", False):
+            return DOSING_PROBLEM_WARNING
+
+        if statuses == (STATUS_OK, STATUS_OK):
+            return DOSING_PROBLEM_OK
+
+        if any(status in (None, STATUS_UNKNOWN) for status in statuses):
+            return None
+
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        data = self._coordinator.data
+        if not data:
+            return {}
+
+        pool = data.get("pool")
+        attributes = {
+            "stale": data.get("stale", False),
+            "stale_since": data.get("captured_at") if data.get("stale") else None,
+            "error": data.get("error"),
+        }
+
+        if pool:
+            attributes.update(
+                {
+                    "chlorine_status": pool["chlorine"]["status"],
+                    "ph_status": pool["ph"]["status"],
+                }
+            )
+
+        return attributes
 
 
 class SyncOrSwimLastCalibrationReadSensor(CoordinatorEntity, SensorEntity):

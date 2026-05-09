@@ -22,7 +22,7 @@ main {
 .page-header {
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
 }
@@ -113,6 +113,17 @@ button:disabled {
   background: #fff;
   color: #334155;
   white-space: nowrap;
+}
+
+.icon-button {
+  min-height: 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 dialog {
@@ -220,23 +231,12 @@ tr:last-child td {
   }
 
   .page-header {
-    display: grid;
     gap: 12px;
     margin-bottom: 14px;
   }
 
-  .header-actions {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
   h1 {
     font-size: 26px;
-  }
-
-  .secondary-button,
-  .header-actions {
-    width: 100%;
   }
 
   dialog {
@@ -260,6 +260,11 @@ tr:last-child td {
   input,
   button {
     min-height: 46px;
+  }
+
+  .icon-button {
+    min-height: 36px;
+    height: 36px;
   }
 
   table,

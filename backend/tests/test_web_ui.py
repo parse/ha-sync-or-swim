@@ -14,8 +14,8 @@ def test_root_serves_web_ui():
     assert "text/html" in response.headers["content-type"]
     assert "SyncOrSwim" in response.text
     assert "Shared Sensors" in response.text
-    assert "Clear saved access" in response.text
-    assert "Share access" in response.text
+    assert 'aria-label="Clear saved access"' in response.text
+    assert 'aria-label="Share access"' in response.text
     assert 'id="share-dialog"' in response.text
     assert "updateAccessView" in response.text
     assert "persistIncomingAccessFromUrl" in response.text

@@ -20,20 +20,18 @@ main {
 }
 
 .page-header {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+  display: grid;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 14px;
 }
 
 .header-actions {
   display: flex;
-  flex: 0 0 auto;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: center;
-  justify-content: flex-end;
-  margin-top: 3px;
+  justify-content: flex-start;
 }
 
 h1 {
@@ -226,22 +224,6 @@ tr:last-child td {
     padding: 20px 14px;
   }
 
-  .page-header {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-    align-items: start;
-    margin-bottom: 14px;
-  }
-
-  .header-actions {
-    display: flex;
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    margin-top: 0;
-    width: auto;
-  }
-
   .brand-title {
     font-size: 16px;
   }
@@ -307,6 +289,22 @@ tr:last-child td {
     font-weight: 700;
     text-transform: uppercase;
     content: attr(data-label);
+  }
+}
+
+@media (min-width: 701px) {
+  .page-header {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .header-actions {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    margin-top: 3px;
   }
 }
 

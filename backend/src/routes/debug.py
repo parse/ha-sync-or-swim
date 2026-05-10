@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from auth import verify_token
 from fastapi import APIRouter, Depends, HTTPException
 from schemas.models import (
+    DosingProblemSchema,
     LatestMeasurementSchema,
     PoolAnalysisSchema,
     UnitAnalysis,
@@ -48,5 +49,11 @@ async def get_debug_measurement(
                 action_required=False,
                 recommended_action="Check if the pump is running",
             ),
+        ),
+        dosing_problem=DosingProblemSchema(
+            state="Warning",
+            stale=False,
+            chlorine_status="ok",
+            ph_status="warning",
         ),
     )

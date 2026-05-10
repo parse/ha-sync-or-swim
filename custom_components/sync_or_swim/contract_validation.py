@@ -1,6 +1,9 @@
 from typing import Any, Literal, TypeAlias, cast
 
 from .generated_api_types import (
+    DosingProblemSchema as _DosingProblemSchema,
+)
+from .generated_api_types import (
     InstallationResponseSchema as _InstallationResponseSchema,
 )
 from .generated_api_types import (
@@ -17,12 +20,15 @@ from .generated_api_types import (
 )
 
 Status = Literal["ok", "warning", "error", "unknown"]
+DosingProblemState = Literal["OK", "Warning", "Error"]
+DosingProblem: TypeAlias = _DosingProblemSchema
 InstallationResponse: TypeAlias = _InstallationResponseSchema
 LatestMeasurement: TypeAlias = _LatestMeasurementSchema
 PoolAnalysis: TypeAlias = _PoolAnalysisSchema
 SharedSensor: TypeAlias = _SharedSensorSchema
 UnitAnalysis: TypeAlias = _UnitAnalysis
 VALID_STATUSES = {"ok", "warning", "error", "unknown"}
+VALID_DOSING_PROBLEM_STATES = {"OK", "Warning", "Error"}
 
 
 class SyncOrSwimData(_LatestMeasurementSchema):
@@ -116,6 +122,34 @@ def validate_shared_sensor(data: Any, field_name: str) -> SharedSensor:
     }
 
 
+def validate_dosing_problem(data: Any, field_name: str) -> DosingProblem:
+    """Validate the backend-derived dosing problem payload."""
+    _require_type(data, dict, field_name)
+    state = data.get("state")
+    if state is not None and state not in VALID_DOSING_PROBLEM_STATES:
+        raise ValueError(
+            f"Expected '{field_name}.state' to be one of {VALID_DOSING_PROBLEM_STATES} or null"
+        )
+    _require_type(data.get("stale"), bool, f"{field_name}.stale")
+    chlorine_status = data.get("chlorine_status")
+    ph_status = data.get("ph_status")
+    if chlorine_status is not None and chlorine_status not in VALID_STATUSES:
+        raise ValueError(
+            f"Expected '{field_name}.chlorine_status' to be one of {VALID_STATUSES} or null"
+        )
+    if ph_status is not None and ph_status not in VALID_STATUSES:
+        raise ValueError(
+            f"Expected '{field_name}.ph_status' to be one of {VALID_STATUSES} or null"
+        )
+
+    return {
+        "state": cast(DosingProblemState | None, state),
+        "stale": cast(bool, data["stale"]),
+        "chlorine_status": cast(Status | None, chlorine_status),
+        "ph_status": cast(Status | None, ph_status),
+    }
+
+
 def validate_latest_measurement(data: Any) -> LatestMeasurement:
     """Validate the backend response used by the consumer coordinator."""
 
@@ -144,11 +178,19 @@ def validate_latest_measurement(data: Any) -> LatestMeasurement:
         validate_shared_sensor(s, f"sensors[{i}]") for i, s in enumerate(sensors_raw)
     ]
 
+    dosing_problem_raw = data.get("dosing_problem")
+    dosing_problem = (
+        validate_dosing_problem(dosing_problem_raw, "dosing_problem")
+        if dosing_problem_raw is not None
+        else None
+    )
+
     validated: _LatestMeasurementSchema = {
         "installation_id": cast(str, data["installation_id"]),
         "captured_at": cast(str | None, data.get("captured_at")),
         "pushed_at": cast(str | None, data.get("pushed_at")),
         "pool": pool,
+        "dosing_problem": dosing_problem,
         "sensors": sensors,
         "raw_response": cast(str | None, data.get("raw_response")),
     }

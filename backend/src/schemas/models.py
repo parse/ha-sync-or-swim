@@ -5,6 +5,7 @@ from typing import Literal, TypedDict
 from pydantic import BaseModel, Field
 
 StatusLiteral = Literal["ok", "warning", "error", "unknown"]
+DosingProblemLiteral = Literal["OK", "Warning", "Error"]
 ModeLiteral = Literal["auto", "standby", "dosing", "error", "unknown", "disabled"]
 
 
@@ -52,11 +53,19 @@ class PoolAnalysisSchema(BaseModel):
     ph: UnitAnalysis
 
 
+class DosingProblemSchema(BaseModel):
+    state: DosingProblemLiteral | None = None
+    stale: bool = False
+    chlorine_status: StatusLiteral | None = None
+    ph_status: StatusLiteral | None = None
+
+
 class LatestMeasurementSchema(BaseModel):
     installation_id: str
     captured_at: datetime | None = None
     pushed_at: datetime | None = None
     pool: PoolAnalysisSchema | None = None
+    dosing_problem: DosingProblemSchema | None = None
     sensors: list[SharedSensorSchema] = Field(default_factory=list)
     raw_response: str | None = None
 

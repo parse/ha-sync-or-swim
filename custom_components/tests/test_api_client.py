@@ -15,6 +15,12 @@ def sample_measurement():
         "captured_at": "2026-04-28T18:16:36Z",
         "pushed_at": "2026-04-28T18:16:37Z",
         "raw_response": None,
+        "dosing_problem": {
+            "state": "Warning",
+            "stale": False,
+            "chlorine_status": "ok",
+            "ph_status": "warning",
+        },
         "pool": {
             "chlorine": {
                 "status": "ok",
@@ -120,7 +126,34 @@ async def test_get_latest_uses_auth_headers_and_validates_response():
         (
             "get",
             "https://backend.example/api/latest/pool-1",
-            {"headers": {"Authorization": "Bearer secret"}, "timeout": 10},
+            {
+                "headers": {"Authorization": "Bearer secret"},
+                "params": None,
+                "timeout": 10,
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_latest_sends_staleness_threshold():
+    api_client = load_api_client()
+    FakeSession.responses = [FakeResponse(payload=sample_measurement())]
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example/", "secret", FakeSession()
+    )
+
+    await client.get_latest("pool-1", 90)
+
+    assert FakeSession.calls == [
+        (
+            "get",
+            "https://backend.example/api/latest/pool-1",
+            {
+                "headers": {"Authorization": "Bearer secret"},
+                "params": {"staleness_threshold_minutes": 90},
+                "timeout": 10,
+            },
         )
     ]
 

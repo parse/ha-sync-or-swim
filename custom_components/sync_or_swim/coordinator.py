@@ -84,6 +84,12 @@ def unknown_data() -> SyncOrSwimData:
                 "recommended_action": "",
             },
         },
+        "dosing_problem": {
+            "state": None,
+            "stale": False,
+            "chlorine_status": STATUS_UNKNOWN,
+            "ph_status": STATUS_UNKNOWN,
+        },
         "sensors": [],
         "captured_at": None,
         "stale": False,
@@ -274,7 +280,9 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
     async def _async_fetch_latest_data(self) -> SyncOrSwimData:
         try:
             _LOGGER.debug("Fetching latest backend data for producer")
-            remote_data = await self._api_client.get_latest(self._installation_id)
+            remote_data = await self._api_client.get_latest(
+                self._installation_id, self._staleness_minutes
+            )
             return {
                 **remote_data,
                 "stale": compute_stale(
@@ -349,7 +357,9 @@ class ConsumerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
     async def _async_update_data(self) -> SyncOrSwimData:
         try:
             _LOGGER.debug("Polling backend for latest data")
-            remote_data = await self._api_client.get_latest(self._installation_id)
+            remote_data = await self._api_client.get_latest(
+                self._installation_id, self._staleness_minutes
+            )
             data: SyncOrSwimData = {
                 **remote_data,
                 "stale": compute_stale(

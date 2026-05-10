@@ -111,18 +111,6 @@ def render_sensors_fragment(sensors: list[SharedSensor]) -> str:
 def render_error_fragment(message: str) -> str:
     return f"""
 <p class="status error">{escape(message)}</p>
-<table>
-  <thead>
-    <tr>
-      <th>Sensor</th>
-      <th>Value</th>
-      <th>Updated</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td colspan="3">{escape(message)}</td></tr>
-  </tbody>
-</table>
 """
 
 

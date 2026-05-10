@@ -11,8 +11,7 @@
     <main>
       <header class="page-header">
         <div>
-          <p class="eyebrow">SyncOrSwim</p>
-          <h1>Shared Sensors</h1>
+          <h1 class="brand-title">SyncOrSwim</h1>
         </div>
         <div class="header-actions">
           <button
@@ -132,13 +131,10 @@
       function updateAccessView() {
         const hasAccess = hasSavedAccess();
         form.hidden = hasAccess;
-        accessSummary.hidden = !hasAccess;
+        accessSummary.hidden = true;
         clearAccessButton.hidden = !hasAccess;
         shareAccessButton.hidden = !hasAccess;
-
-        if (hasAccess) {
-          accessSummary.textContent = `Showing ${installationInput.value.trim()}`;
-        }
+        accessSummary.textContent = "";
       }
 
       form.addEventListener("submit", () => {
@@ -195,7 +191,7 @@
           event.detail.xhr.status === 401
             ? "Unauthorized. Check the web UI token."
             : "Could not load shared sensors.";
-        sensorsPanel.innerHTML = `<p class="status error">${message}</p><table><tbody><tr><td>${message}</td></tr></tbody></table>`;
+        sensorsPanel.innerHTML = `<p class="status error">${message}</p>`;
       });
 
       function localizeTimestamps() {

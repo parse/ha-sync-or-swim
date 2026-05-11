@@ -156,7 +156,10 @@ class SyncOrSwimProblemSensor(CoordinatorEntity, SensorEntity):
 
         dosing_problem = data.get("dosing_problem")
         if dosing_problem:
-            return cast(str | None, dosing_problem.get("state"))
+            state = cast(str | None, dosing_problem.get("state"))
+            if data.get("stale", False) and state != DOSING_PROBLEM_ERROR:
+                return DOSING_PROBLEM_WARNING
+            return state
 
         return None
 

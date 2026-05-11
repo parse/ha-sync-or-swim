@@ -246,6 +246,31 @@ def test_problem_sensor_uses_backend_dosing_problem_state(state):
     assert problem.native_value == state
 
 
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [("OK", "Warning"), ("Warning", "Warning"), ("Error", "Error"), (None, "Warning")],
+)
+def test_problem_sensor_marks_cached_backend_state_stale(state, expected):
+    sensor = load_module("sensor")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
+    coordinator = SimpleNamespace(
+        data=coordinator_data(
+            stale=True,
+            dosing_problem={
+                "state": state,
+                "stale": False,
+                "chlorine_status": "ok",
+                "ph_status": "ok",
+            },
+        )
+    )
+    entry.runtime_data = coordinator
+
+    problem = sensor.SyncOrSwimProblemSensor(coordinator, entry)
+
+    assert problem.native_value == expected
+
+
 def test_problem_sensor_does_not_derive_state_without_backend_dosing_problem():
     sensor = load_module("sensor")
     entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())

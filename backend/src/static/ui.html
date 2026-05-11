@@ -59,6 +59,8 @@
         <button id="refresh" type="submit">Refresh</button>
       </form>
 
+      <div id="pool-status-panel"></div>
+
       <div id="sensors-panel">
         <p class="status">Enter an installation ID and token to load sensors.</p>
         <table>
@@ -88,6 +90,7 @@
       const form = document.querySelector("#sensor-form");
       const installationInput = document.querySelector("#installation-id");
       const tokenInput = document.querySelector("#web-token");
+      const poolStatusPanel = document.querySelector("#pool-status-panel");
       const sensorsPanel = document.querySelector("#sensors-panel");
       const accessSummary = document.querySelector("#access-summary");
       const clearAccessButton = document.querySelector("#clear-access");
@@ -121,11 +124,11 @@
           "syncorswim.installationId",
           installationInput.value.trim(),
         );
-        localStorage.setItem("syncorswim.webToken", tokenInput.value);
+        localStorage.setItem("syncorswim.webToken", tokenInput.value.trim());
       }
 
       function hasSavedAccess() {
-        return Boolean(installationInput.value.trim() && tokenInput.value);
+        return Boolean(installationInput.value.trim() && tokenInput.value.trim());
       }
 
       function updateAccessView() {
@@ -140,6 +143,7 @@
       form.addEventListener("submit", () => {
         storeFormValues();
         updateAccessView();
+        loadPoolStatus();
       });
 
       clearAccessButton.addEventListener("click", () => {
@@ -151,6 +155,7 @@
         if (shareDialog.open) {
           shareDialog.close();
         }
+        poolStatusPanel.innerHTML = "";
         sensorsPanel.innerHTML =
           '<p class="status">Enter an installation ID and token to load sensors.</p><table><tbody><tr><td>Enter an installation ID and token to load sensors.</td></tr></tbody></table>';
         updateAccessView();
@@ -158,13 +163,18 @@
       });
 
       document.body.addEventListener("htmx:configRequest", (event) => {
-        event.detail.headers.Authorization = `Bearer ${tokenInput.value}`;
+        event.detail.headers.Authorization = `Bearer ${tokenInput.value.trim()}`;
       });
 
       document.body.addEventListener("htmx:beforeRequest", (event) => {
         if (event.detail.elt === shareAccessButton) {
           shareDialogContent.innerHTML = '<p class="status">Loading...</p>';
           shareDialog.showModal();
+          return;
+        }
+
+        if (event.detail.target === poolStatusPanel) {
+          poolStatusPanel.innerHTML = '<p class="status">Loading...</p>';
           return;
         }
 
@@ -183,6 +193,15 @@
           return;
         }
 
+        if (event.detail.target === poolStatusPanel) {
+          const message =
+            event.detail.xhr.status === 401
+              ? "Unauthorized. Check the web UI token."
+              : "Could not load pool status.";
+          poolStatusPanel.innerHTML = `<p class="status error">${message}</p>`;
+          return;
+        }
+
         if (event.detail.target !== sensorsPanel) {
           return;
         }
@@ -195,7 +214,7 @@
       });
 
       function localizeTimestamps() {
-        sensorsPanel.querySelectorAll("time[datetime]").forEach((time) => {
+        document.querySelectorAll("time[datetime]").forEach((time) => {
           const date = new Date(time.dateTime);
           if (Number.isNaN(date.getTime())) {
             return;
@@ -210,25 +229,45 @@
       }
 
       document.body.addEventListener("htmx:afterSwap", (event) => {
-        if (event.detail.target === sensorsPanel) {
+        if (
+          event.detail.target === sensorsPanel ||
+          event.detail.target === poolStatusPanel
+        ) {
           localizeTimestamps();
         }
       });
 
-      function loadSavedSensors() {
-        if (!installationInput.value || !tokenInput.value) {
+      function loadPoolStatus() {
+        if (!installationInput.value.trim() || !tokenInput.value.trim()) {
+          return;
+        }
+
+        htmx.ajax(
+          "GET",
+          `/ui/pool-status/latest-fragment?installation_id=${encodeURIComponent(installationInput.value.trim())}`,
+          {
+            target: "#pool-status-panel",
+            swap: "innerHTML",
+            headers: { Authorization: `Bearer ${tokenInput.value.trim()}` },
+          },
+        );
+      }
+
+      function loadSavedData() {
+        if (!installationInput.value.trim() || !tokenInput.value.trim()) {
           return;
         }
 
         storeFormValues();
         updateAccessView();
+        loadPoolStatus();
         htmx.ajax(
           "GET",
           `/ui/sensors/latest-fragment?installation_id=${encodeURIComponent(installationInput.value.trim())}`,
           {
             target: "#sensors-panel",
             swap: "innerHTML",
-            headers: { Authorization: `Bearer ${tokenInput.value}` },
+            headers: { Authorization: `Bearer ${tokenInput.value.trim()}` },
           },
         );
       }
@@ -236,7 +275,7 @@
       document.addEventListener("DOMContentLoaded", () => {
         persistIncomingAccessFromUrl();
         updateAccessView();
-        window.setTimeout(loadSavedSensors, 0);
+        window.setTimeout(loadSavedData, 0);
       });
     </script>
   </body>

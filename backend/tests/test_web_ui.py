@@ -1,9 +1,47 @@
-from db.models import Installation, SharedSensor
+from datetime import datetime, timedelta, timezone
+
+from db.models import Installation, Measurement, SharedSensor
 from db.session import SessionLocal
 from fastapi.testclient import TestClient
 from main import app
 
 client = TestClient(app)
+
+
+def add_measurement(
+    installation_id: str = "test-installation",
+    *,
+    chlorine_status: str = "ok",
+    ph_status: str = "ok",
+    captured_at: datetime | None = None,
+) -> None:
+    with SessionLocal() as db:
+        if db.get(Installation, installation_id) is None:
+            db.add(Installation(id=installation_id))
+        db.add(
+            Measurement(
+                installation_id=installation_id,
+                captured_at=captured_at or datetime.now(timezone.utc),
+                chlorine_status=chlorine_status,
+                chlorine_diagnosis=None,
+                chlorine_pattern="auto",
+                chlorine_blinking=[],
+                chlorine_solid=[],
+                chlorine_summary="Chlorine summary",
+                chlorine_action=chlorine_status in {"warning", "error"},
+                chlorine_recommended="",
+                ph_status=ph_status,
+                ph_diagnosis=None,
+                ph_pattern="auto",
+                ph_blinking=[],
+                ph_solid=[],
+                ph_summary="pH summary",
+                ph_action=ph_status in {"warning", "error"},
+                ph_recommended="",
+                raw_response=None,
+            )
+        )
+        db.commit()
 
 
 def test_root_serves_web_ui():
@@ -21,10 +59,15 @@ def test_root_serves_web_ui():
     assert "persistIncomingAccessFromUrl" in response.text
     assert "removeItem" in response.text
     assert 'params.get("web_token")' in response.text
-    assert 'localStorage.setItem("syncorswim.webToken"' in response.text
+    assert (
+        'localStorage.setItem("syncorswim.webToken", tokenInput.value.trim())'
+        in response.text
+    )
     assert 'cleanUrl.searchParams.delete("web_token")' in response.text
     assert "history.replaceState" in response.text
     assert 'href="/static/ui.css"' in response.text
+    assert 'id="pool-status-panel"' in response.text
+    assert "/ui/pool-status/latest-fragment" in response.text
     assert "/ui/sensors/latest-fragment" in response.text
     assert "/ui/share-qr-fragment" in response.text
     assert 'hx-target="#share-dialog-content"' in response.text
@@ -35,6 +78,7 @@ def test_root_serves_web_ui():
     assert "htmx.ajax" in response.text
     assert "Intl.DateTimeFormat" in response.text
     assert "time[datetime]" in response.text
+    assert "tokenInput.value.trim()" in response.text
 
 
 def test_ui_alias_serves_web_ui():
@@ -56,6 +100,7 @@ def test_static_css_is_served():
     assert "share-dialog-header" in response.text
     assert "qr-code" in response.text
     assert "grid-template-columns" in response.text
+    assert "pool-status" in response.text
 
 
 def test_share_qr_fragment_returns_qr_code():
@@ -98,6 +143,83 @@ def test_share_qr_fragment_returns_ui_error_for_bad_installation_id():
 
     assert response.status_code == 200
     assert "Invalid installation ID" in response.text
+
+
+def test_latest_pool_status_fragment_returns_status_panel():
+    add_measurement(ph_status="warning")
+
+    response = client.get(
+        "/ui/pool-status/latest-fragment",
+        params={"installation_id": "test-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "Dosing problem" in response.text
+    assert "Warning" in response.text
+    assert "Chlorine" in response.text
+    assert "pH" in response.text
+    assert "<time datetime=" in response.text
+
+
+def test_latest_pool_status_fragment_returns_stale_warning():
+    add_measurement(captured_at=datetime.now(timezone.utc) - timedelta(minutes=121))
+
+    response = client.get(
+        "/ui/pool-status/latest-fragment",
+        params={"installation_id": "test-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "Warning" in response.text
+    assert "<dd>Yes</dd>" in response.text
+
+
+def test_latest_pool_status_fragment_rejects_missing_wrong_and_push_tokens():
+    add_measurement()
+    for headers in (
+        {},
+        {"Authorization": "Bearer wrong-token"},
+        {"Authorization": "Bearer test-token"},
+    ):
+        response = client.get(
+            "/ui/pool-status/latest-fragment",
+            params={"installation_id": "test-installation"},
+            headers=headers,
+        )
+
+        assert response.status_code == 401
+
+
+def test_latest_pool_status_fragment_returns_ui_errors_as_html():
+    with SessionLocal() as db:
+        db.add(Installation(id="empty-installation"))
+        db.commit()
+
+    bad_id_response = client.get(
+        "/ui/pool-status/latest-fragment",
+        params={"installation_id": "Bad_Installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+    missing_installation_response = client.get(
+        "/ui/pool-status/latest-fragment",
+        params={"installation_id": "unknown-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+    missing_measurement_response = client.get(
+        "/ui/pool-status/latest-fragment",
+        params={"installation_id": "empty-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+
+    assert bad_id_response.status_code == 200
+    assert "Invalid installation ID" in bad_id_response.text
+    assert missing_installation_response.status_code == 200
+    assert "Installation not found." in missing_installation_response.text
+    assert missing_measurement_response.status_code == 200
+    assert "No measurements found." in missing_measurement_response.text
 
 
 def test_latest_sensors_accepts_web_ui_token():

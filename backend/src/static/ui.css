@@ -186,6 +186,83 @@ h2 {
   font-weight: 600;
 }
 
+.eyebrow {
+  margin: 0 0 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pool-status {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid #d9e0ea;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 10%);
+}
+
+.pool-status h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.pool-status-value {
+  min-width: 92px;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #e5e7eb;
+  color: #334155;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pool-status-value.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.pool-status-value.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.pool-status-value.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.pool-status-details {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.pool-status-details div {
+  min-width: 0;
+}
+
+.pool-status-details dt {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pool-status-details dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -251,6 +328,18 @@ tr:last-child td {
   .access-form {
     grid-template-columns: 1fr;
     margin-bottom: 16px;
+  }
+
+  .pool-status {
+    grid-template-columns: 1fr;
+  }
+
+  .pool-status-value {
+    width: fit-content;
+  }
+
+  .pool-status-details {
+    grid-template-columns: 1fr 1fr;
   }
 
   input,

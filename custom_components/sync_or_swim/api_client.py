@@ -29,10 +29,18 @@ class SyncOrSwimApiClient:
     def _auth_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"} if self._token else {}
 
-    async def get_latest(self, installation_id: str) -> LatestMeasurement:
+    async def get_latest(
+        self, installation_id: str, staleness_threshold_minutes: int | None = None
+    ) -> LatestMeasurement:
+        params = (
+            {"staleness_threshold_minutes": staleness_threshold_minutes}
+            if staleness_threshold_minutes is not None
+            else None
+        )
         async with self._session.get(
             f"{self._backend_url}/api/latest/{installation_id}",
             headers=self._auth_headers(),
+            params=params,
             timeout=10,
         ) as response:
             if response.status == 404:

@@ -222,52 +222,20 @@ def test_led_sensor_formats_solid_and_blinking_leds(
     assert leds.extra_state_attributes["blinking_leds"] == (blinking_leds or [])
 
 
-@pytest.mark.parametrize(
-    ("data", "expected"),
-    [
-        ({}, None),
-        (
-            coordinator_data(pool={"chlorine": {"status": "unknown"}}, stale=False),
-            None,
-        ),
-        (coordinator_data(), "Warning"),
-        (
-            coordinator_data(
-                pool={
-                    "chlorine": {"status": "error"},
-                    "ph": {"status": "ok"},
-                },
-                stale=False,
-            ),
-            "Error",
-        ),
-        (
-            coordinator_data(
-                pool={
-                    "chlorine": {"status": "ok"},
-                    "ph": {"status": "error"},
-                },
-                stale=False,
-            ),
-            "Error",
-        ),
-        (coordinator_data(stale=True), "Warning"),
-        (
-            coordinator_data(
-                pool={
-                    "chlorine": {"status": "ok"},
-                    "ph": {"status": "ok"},
-                },
-                stale=False,
-            ),
-            "OK",
-        ),
-    ],
-)
-def test_problem_sensor_state_matrix(data, expected):
+@pytest.mark.parametrize("state", [None, "OK", "Warning", "Error"])
+def test_problem_sensor_uses_backend_dosing_problem_state(state):
     sensor = load_module("sensor")
     entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
-    coordinator = SimpleNamespace(data=data)
+    coordinator = SimpleNamespace(
+        data=coordinator_data(
+            dosing_problem={
+                "state": state,
+                "stale": state == "Warning",
+                "chlorine_status": "ok",
+                "ph_status": "ok",
+            },
+        )
+    )
     entry.runtime_data = coordinator
 
     problem = sensor.SyncOrSwimProblemSensor(coordinator, entry)
@@ -275,7 +243,51 @@ def test_problem_sensor_state_matrix(data, expected):
     assert problem._attr_name == "SyncOrSwim Dosing Problem"
     assert problem._attr_device_class == "enum"
     assert problem._attr_options == ["OK", "Warning", "Error"]
+    assert problem.native_value == state
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [("OK", "Warning"), ("Warning", "Warning"), ("Error", "Error"), (None, "Warning")],
+)
+def test_problem_sensor_marks_cached_backend_state_stale(state, expected):
+    sensor = load_module("sensor")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
+    coordinator = SimpleNamespace(
+        data=coordinator_data(
+            stale=True,
+            dosing_problem={
+                "state": state,
+                "stale": False,
+                "chlorine_status": "ok",
+                "ph_status": "ok",
+            },
+        )
+    )
+    entry.runtime_data = coordinator
+
+    problem = sensor.SyncOrSwimProblemSensor(coordinator, entry)
+
     assert problem.native_value == expected
+
+
+def test_problem_sensor_does_not_derive_state_without_backend_dosing_problem():
+    sensor = load_module("sensor")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
+    coordinator = SimpleNamespace(
+        data=coordinator_data(
+            pool={
+                "chlorine": {"status": "ok"},
+                "ph": {"status": "ok"},
+            },
+            stale=True,
+        )
+    )
+    entry.runtime_data = coordinator
+
+    problem = sensor.SyncOrSwimProblemSensor(coordinator, entry)
+
+    assert problem.native_value is None
 
 
 def test_button_name_is_sync_or_swim_prefixed():
@@ -381,6 +393,12 @@ def test_disabled_installation_keeps_data_non_problematic_and_buttons_offline():
             pool={
                 "chlorine": {"status": "ok"},
                 "ph": {"status": "ok"},
+            },
+            dosing_problem={
+                "state": "OK",
+                "stale": False,
+                "chlorine_status": "ok",
+                "ph_status": "ok",
             },
             stale=False,
         ),

@@ -3,14 +3,13 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import STATUS_ERROR, STATUS_OK, STATUS_UNKNOWN, STATUS_WARNING
 from .entry_types import SyncOrSwimConfigEntry, require_runtime_coordinator
 
 if TYPE_CHECKING:
@@ -155,25 +154,12 @@ class SyncOrSwimProblemSensor(CoordinatorEntity, SensorEntity):
         if not data:
             return None
 
-        pool = data.get("pool")
-        if not pool:
-            return DOSING_PROBLEM_WARNING if data.get("stale", False) else None
-
-        chlorine_status = pool.get("chlorine", {}).get("status")
-        ph_status = pool.get("ph", {}).get("status")
-        statuses = (chlorine_status, ph_status)
-
-        if STATUS_ERROR in statuses:
-            return DOSING_PROBLEM_ERROR
-
-        if STATUS_WARNING in statuses or data.get("stale", False):
-            return DOSING_PROBLEM_WARNING
-
-        if statuses == (STATUS_OK, STATUS_OK):
-            return DOSING_PROBLEM_OK
-
-        if any(status in (None, STATUS_UNKNOWN) for status in statuses):
-            return None
+        dosing_problem = data.get("dosing_problem")
+        if dosing_problem:
+            state = cast(str | None, dosing_problem.get("state"))
+            if data.get("stale", False) and state != DOSING_PROBLEM_ERROR:
+                return DOSING_PROBLEM_WARNING
+            return state
 
         return None
 

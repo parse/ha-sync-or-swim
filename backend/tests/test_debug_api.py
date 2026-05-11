@@ -17,11 +17,13 @@ def test_debug_endpoint_returns_latest_measurement_contract():
         "captured_at",
         "pushed_at",
         "pool",
+        "dosing_problem",
         "sensors",
         "raw_response",
     }
     assert data["installation_id"] == "test-installation"
     assert data["raw_response"] is None
+    assert data["dosing_problem"]["state"] == "Warning"
     assert data["pool"]["chlorine"]["status"] == "ok"
     assert data["pool"]["ph"]["status"] == "warning"
 

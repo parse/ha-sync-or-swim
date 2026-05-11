@@ -10,6 +10,13 @@ class BodyAnalyzeAndStoreImageBurstApiAnalyzeInstallationIdBurstPost(TypedDict):
     files: list[str]
 
 
+class DosingProblemSchema(TypedDict):
+    chlorine_status: NotRequired[Literal["ok", "warning", "error", "unknown"] | None]
+    ph_status: NotRequired[Literal["ok", "warning", "error", "unknown"] | None]
+    stale: NotRequired[bool]
+    state: NotRequired[Literal["OK", "Warning", "Error"] | None]
+
+
 class InstallationResponseSchema(TypedDict):
     created_at: str | None
     id: str
@@ -66,6 +73,7 @@ class PoolAnalysisSchema(TypedDict):
 
 class LatestMeasurementSchema(TypedDict):
     captured_at: NotRequired[str | None]
+    dosing_problem: NotRequired[DosingProblemSchema | None]
     installation_id: str
     pool: NotRequired[PoolAnalysisSchema | None]
     pushed_at: NotRequired[str | None]

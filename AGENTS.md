@@ -16,8 +16,13 @@ connection.
 Home Assistant has two roles. Producers capture camera bursts and send them to
 `POST /api/analyze/{installation_id}/burst`. Consumers poll
 `GET /api/latest/{installation_id}` for the latest stored backend reading. Both
-use the same backend response contract. Older top-level routes still exist as
-compatibility aliases, but new code should prefer `/api/...` routes.
+use the same backend response contract. Routes should prefer `/api/...` routes
+and `/ui/...` for fragments.
+
+The backend serves a small shared-sensors web UI at `/` and `/ui`.
+Configure `WEB_UI_TOKEN` for this read-only UI; it can only read certain pool
+values and shared sensors through specific routes. The UI uses htmx from
+jsDelivr and does not require a frontend build step.
 
 Keep changes simple, strict, and easy to review. Read the nearby code before
 changing it, make sure the goal is clear, and avoid guessing about behavior or

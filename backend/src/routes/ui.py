@@ -1,22 +1,26 @@
+from datetime import timezone
 from html import escape
 from urllib.parse import urlencode
 
 import qrcode
 import qrcode.image.svg
 from auth import verify_web_ui_token
-from db.models import Installation
+from db.models import Installation, Measurement
 from db.session import get_db
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import HTMLResponse
+from measurement_service import latest_schema_from_measurement
 from routes.installations import (
     latest_sensors_for_installation,
     render_error_fragment,
     render_sensors_fragment,
 )
 from schemas.models import validate_installation_id
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 router = APIRouter()
+WEB_UI_STALENESS_THRESHOLD_MINUTES = 120
 
 
 def bearer_token_from_authorization(authorization: str | None) -> str:
@@ -53,6 +57,86 @@ def render_share_qr_fragment(
 </div>
 <p class="share-installation">Installation ID: <strong>{escape(installation_id)}</strong></p>
 """
+
+
+def render_pool_status_fragment(measurement: Measurement) -> str:
+    latest = latest_schema_from_measurement(
+        measurement,
+        staleness_threshold_minutes=WEB_UI_STALENESS_THRESHOLD_MINUTES,
+    )
+    problem = latest.dosing_problem
+    state = problem.state if problem else None
+    state_label = state or "Unknown"
+    state_class = state_label.lower()
+    captured_at_value = latest.captured_at
+    if captured_at_value and (
+        captured_at_value.tzinfo is None or captured_at_value.utcoffset() is None
+    ):
+        captured_at_value = captured_at_value.replace(tzinfo=timezone.utc)
+    captured_at = captured_at_value.isoformat() if captured_at_value else ""
+    captured = (
+        f'<time datetime="{escape(captured_at)}">{escape(captured_at)}</time>'
+        if captured_at
+        else "Unknown"
+    )
+    stale = problem.stale if problem else False
+    chlorine_status = problem.chlorine_status if problem else None
+    ph_status = problem.ph_status if problem else None
+
+    return f"""
+<section class="pool-status" aria-label="Pool status">
+  <div>
+    <p class="eyebrow">Pool Status</p>
+    <h2>Dosing problem</h2>
+  </div>
+  <div class="pool-status-value {escape(state_class)}">{escape(state_label)}</div>
+  <dl class="pool-status-details">
+    <div>
+      <dt>Captured</dt>
+      <dd>{captured}</dd>
+    </div>
+    <div>
+      <dt>Stale</dt>
+      <dd>{escape("Yes" if stale else "No")}</dd>
+    </div>
+    <div>
+      <dt>Chlorine</dt>
+      <dd>{escape(chlorine_status or "unknown")}</dd>
+    </div>
+    <div>
+      <dt>pH</dt>
+      <dd>{escape(ph_status or "unknown")}</dd>
+    </div>
+  </dl>
+</section>
+"""
+
+
+@router.get("/pool-status/latest-fragment", response_class=HTMLResponse)
+async def get_latest_pool_status_fragment(
+    installation_id: str,
+    db: Session = Depends(get_db),
+    _auth: None = Depends(verify_web_ui_token),
+) -> HTMLResponse:
+    try:
+        validate_installation_id(installation_id)
+    except ValueError:
+        return HTMLResponse(render_error_fragment("Invalid installation ID"))
+
+    installation = db.get(Installation, installation_id)
+    if installation is None:
+        return HTMLResponse(render_error_fragment("Installation not found."))
+
+    measurement = (
+        db.query(Measurement)
+        .filter(Measurement.installation_id == installation_id)
+        .order_by(desc(Measurement.captured_at))
+        .first()
+    )
+    if measurement is None:
+        return HTMLResponse(render_error_fragment("No measurements found."))
+
+    return HTMLResponse(render_pool_status_fragment(measurement))
 
 
 @router.get("/sensors/latest-fragment", response_class=HTMLResponse)

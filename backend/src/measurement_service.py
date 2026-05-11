@@ -5,6 +5,8 @@ from db.models import Installation, Measurement, SharedSensor
 from schemas.models import (
     CVAnalysisResult,
     CVUnitAnalysisPayload,
+    DosingProblemLiteral,
+    DosingProblemSchema,
     LatestMeasurementSchema,
     PoolAnalysisSchema,
     SharedSensorSchema,
@@ -23,6 +25,33 @@ def status_from_db(value: str) -> StatusLiteral:
     if value in {"ok", "warning", "error", "unknown"}:
         return cast(StatusLiteral, value)
     return "unknown"
+
+
+def compute_stale(captured_at: datetime | None, threshold_minutes: int) -> bool:
+    if captured_at is None:
+        return False
+    if captured_at.tzinfo is None:
+        captured_at = captured_at.replace(tzinfo=timezone.utc)
+    return (
+        datetime.now(tz=timezone.utc) - captured_at
+    ).total_seconds() > threshold_minutes * 60
+
+
+def dosing_problem_from_statuses(
+    chlorine_status: StatusLiteral | None,
+    ph_status: StatusLiteral | None,
+    stale: bool,
+) -> DosingProblemLiteral | None:
+    statuses = (chlorine_status, ph_status)
+    if "error" in statuses:
+        return "Error"
+    if "warning" in statuses or stale:
+        return "Warning"
+    if statuses == ("ok", "ok"):
+        return "OK"
+    if any(status in (None, "unknown") for status in statuses):
+        return None
+    return None
 
 
 def unit_from_cv(data: CVUnitAnalysisPayload) -> UnitAnalysis:
@@ -56,7 +85,10 @@ def unit_from_cv(data: CVUnitAnalysisPayload) -> UnitAnalysis:
 
 
 def latest_schema_from_measurement(
-    measurement: Measurement, sensors: list[SharedSensor] | None = None
+    measurement: Measurement,
+    sensors: list[SharedSensor] | None = None,
+    *,
+    staleness_threshold_minutes: int | None = None,
 ) -> LatestMeasurementSchema:
     sensor_schemas = []
     if sensors:
@@ -78,13 +110,21 @@ def latest_schema_from_measurement(
                 )
             )
 
+    stale = (
+        compute_stale(measurement.captured_at, staleness_threshold_minutes)
+        if staleness_threshold_minutes is not None
+        else False
+    )
+    chlorine_status = status_from_db(measurement.chlorine_status)
+    ph_status = status_from_db(measurement.ph_status)
+
     return LatestMeasurementSchema(
         installation_id=measurement.installation_id,
         captured_at=measurement.captured_at,
         pushed_at=measurement.pushed_at,
         pool=PoolAnalysisSchema(
             chlorine=UnitAnalysis(
-                status=status_from_db(measurement.chlorine_status),
+                status=chlorine_status,
                 diagnosis=measurement.chlorine_diagnosis,
                 pattern_detected=measurement.chlorine_pattern,
                 blinking_leds=measurement.chlorine_blinking or [],
@@ -94,7 +134,7 @@ def latest_schema_from_measurement(
                 recommended_action=measurement.chlorine_recommended or "",
             ),
             ph=UnitAnalysis(
-                status=status_from_db(measurement.ph_status),
+                status=ph_status,
                 diagnosis=measurement.ph_diagnosis,
                 pattern_detected=measurement.ph_pattern,
                 blinking_leds=measurement.ph_blinking or [],
@@ -103,6 +143,12 @@ def latest_schema_from_measurement(
                 action_required=measurement.ph_action,
                 recommended_action=measurement.ph_recommended or "",
             ),
+        ),
+        dosing_problem=DosingProblemSchema(
+            state=dosing_problem_from_statuses(chlorine_status, ph_status, stale),
+            stale=stale,
+            chlorine_status=chlorine_status,
+            ph_status=ph_status,
         ),
         sensors=sensor_schemas,
         raw_response=measurement.raw_response,

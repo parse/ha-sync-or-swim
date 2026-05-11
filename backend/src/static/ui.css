@@ -200,7 +200,7 @@ h2 {
   grid-template-columns: minmax(160px, 1fr) auto;
   gap: 14px;
   align-items: start;
-  margin-bottom: 18px;
+  margin-top: 18px;
   padding: 16px;
   border: 1px solid #d9e0ea;
   border-radius: 8px;

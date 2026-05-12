@@ -304,6 +304,8 @@ def test_binary_problem_sensor_prefers_backend_dosing_problem_state(state, expec
 
     problem = binary_sensor.SyncOrSwimProblemSensor(coordinator, entry)
 
+    assert problem._attr_name == "SyncOrSwim Dosing Problem Active"
+    assert problem._attr_unique_id == "entry-1_problem_binary"
     assert problem.is_on is expected
     assert problem.extra_state_attributes["problem_reason"] == (
         "none" if state == "OK" else "multiple_units"

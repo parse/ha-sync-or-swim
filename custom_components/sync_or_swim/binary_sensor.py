@@ -85,12 +85,15 @@ class SyncOrSwimDosingProblemBinarySensor(CoordinatorEntity, BinarySensorEntity)
         pool = data.get("pool")
         dosing_problem = data.get("dosing_problem")
         problem_reason = dosing_problem.get("reason") if dosing_problem else None
+        problem_message = dosing_problem.get("message") if dosing_problem else None
         attributes = {
             "stale": data.get("stale", False),
             "stale_since": data.get("captured_at") if data.get("stale") else None,
             "error": data.get("error"),
             "problem_reason": problem_reason
             or ("stale_data" if data.get("stale", False) else None),
+            "problem_message": problem_message
+            or ("Latest reading is stale" if data.get("stale", False) else None),
         }
 
         if dosing_problem:

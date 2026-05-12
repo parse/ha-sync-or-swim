@@ -35,16 +35,46 @@ def measurement(
 
 
 @pytest.mark.parametrize(
-    ("chlorine_status", "ph_status", "expected_state", "expected_reason"),
+    (
+        "chlorine_status",
+        "ph_status",
+        "expected_state",
+        "expected_reason",
+        "expected_message",
+    ),
     [
-        ("ok", "ok", "OK", "none"),
-        ("warning", "ok", "Warning", "chlorine_warning"),
-        ("ok", "warning", "Warning", "ph_warning"),
-        ("error", "ok", "Error", "chlorine_error"),
-        ("ok", "error", "Error", "ph_error"),
-        ("error", "warning", "Error", "multiple_units"),
-        ("warning", "warning", "Warning", "multiple_units"),
-        ("unknown", "ok", None, "unknown"),
+        ("ok", "ok", "OK", "none", "No dosing problem detected"),
+        (
+            "warning",
+            "ok",
+            "Warning",
+            "chlorine_warning",
+            "Chlorine status is warning",
+        ),
+        ("ok", "warning", "Warning", "ph_warning", "pH status is warning"),
+        (
+            "error",
+            "ok",
+            "Error",
+            "chlorine_error",
+            "Chlorine dosing unit reports an error",
+        ),
+        ("ok", "error", "Error", "ph_error", "pH dosing unit reports an error"),
+        (
+            "error",
+            "warning",
+            "Error",
+            "multiple_units",
+            "Multiple dosing units report warnings or errors",
+        ),
+        (
+            "warning",
+            "warning",
+            "Warning",
+            "multiple_units",
+            "Multiple dosing units report warnings or errors",
+        ),
+        ("unknown", "ok", None, "unknown", "Dosing problem state is unknown"),
     ],
 )
 def test_latest_schema_includes_dosing_problem_state(
@@ -52,6 +82,7 @@ def test_latest_schema_includes_dosing_problem_state(
     ph_status: str,
     expected_state: str | None,
     expected_reason: str,
+    expected_message: str,
 ):
     latest = latest_schema_from_measurement(
         measurement(chlorine_status=chlorine_status, ph_status=ph_status)
@@ -60,6 +91,7 @@ def test_latest_schema_includes_dosing_problem_state(
     assert latest.dosing_problem is not None
     assert latest.dosing_problem.state == expected_state
     assert latest.dosing_problem.reason == expected_reason
+    assert latest.dosing_problem.message == expected_message
     assert latest.dosing_problem.chlorine_status == chlorine_status
     assert latest.dosing_problem.ph_status == ph_status
 
@@ -73,11 +105,12 @@ def test_latest_schema_marks_stale_measurement_as_warning():
     assert latest.dosing_problem is not None
     assert latest.dosing_problem.state == "Warning"
     assert latest.dosing_problem.reason == "stale_data"
+    assert latest.dosing_problem.message == "Latest reading is stale"
     assert latest.dosing_problem.stale is True
 
 
 @pytest.mark.parametrize(
-    ("payload", "expected"),
+    ("payload", "expected_action_required", "expected_recommended_action"),
     [
         (
             {
@@ -88,6 +121,7 @@ def test_latest_schema_marks_stale_measurement_as_warning():
                 "led_states": [False] * 7,
                 "blinking": [1, 2, 3, 5, 6, 7],
             },
+            True,
             "Dosing stopped after timeout. Check the dosing unit and circulation.",
         ),
         (
@@ -99,6 +133,7 @@ def test_latest_schema_marks_stale_measurement_as_warning():
                 "led_states": [False] * 7,
                 "blinking": [4],
             },
+            True,
             "Unit is in standby. Check that circulation is running.",
         ),
         (
@@ -110,7 +145,8 @@ def test_latest_schema_marks_stale_measurement_as_warning():
                 "led_states": [False, True, False, False, False, False, False],
                 "blinking": [],
             },
-            "Value is below target. Check the dosing unit and current pool value.",
+            False,
+            "Value is below target. Unit may be dosing or waiting for the value to rise.",
         ),
         (
             {
@@ -121,7 +157,8 @@ def test_latest_schema_marks_stale_measurement_as_warning():
                 "led_states": [False, False, False, False, False, True, False],
                 "blinking": [],
             },
-            "Value is above target. Check the dosing unit and current pool value.",
+            False,
+            "Value is above target. Unit may be dosing or waiting for the value to drop.",
         ),
         (
             {
@@ -132,6 +169,7 @@ def test_latest_schema_marks_stale_measurement_as_warning():
                 "led_states": [False] * 7,
                 "blinking": [],
             },
+            True,
             "Check dosing unit LED pattern.",
         ),
         (
@@ -143,9 +181,15 @@ def test_latest_schema_marks_stale_measurement_as_warning():
                 "led_states": [False, False, False, True, False, False, False],
                 "blinking": [],
             },
+            False,
             "",
         ),
     ],
 )
-def test_unit_from_cv_recommends_specific_actions(payload, expected):
-    assert unit_from_cv(payload).recommended_action == expected
+def test_unit_from_cv_recommends_specific_actions(
+    payload, expected_action_required, expected_recommended_action
+):
+    unit = unit_from_cv(payload)
+
+    assert unit.action_required is expected_action_required
+    assert unit.recommended_action == expected_recommended_action

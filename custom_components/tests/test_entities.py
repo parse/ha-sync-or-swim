@@ -231,6 +231,9 @@ def test_problem_sensor_uses_backend_dosing_problem_state(state):
             dosing_problem={
                 "state": state,
                 "reason": "none" if state == "OK" else "chlorine_warning",
+                "message": "No dosing problem detected"
+                if state == "OK"
+                else "Chlorine status is warning",
                 "stale": state == "Warning",
                 "chlorine_status": "ok",
                 "ph_status": "ok",
@@ -248,6 +251,9 @@ def test_problem_sensor_uses_backend_dosing_problem_state(state):
     assert problem.extra_state_attributes["problem_reason"] == (
         "none" if state == "OK" else "chlorine_warning"
     )
+    assert problem.extra_state_attributes["problem_message"] == (
+        "No dosing problem detected" if state == "OK" else "Chlorine status is warning"
+    )
 
 
 @pytest.mark.parametrize(
@@ -263,6 +269,7 @@ def test_problem_sensor_marks_cached_backend_state_stale(state, expected):
             dosing_problem={
                 "state": state,
                 "reason": "stale_data",
+                "message": "Latest reading is stale",
                 "stale": False,
                 "chlorine_status": "ok",
                 "ph_status": "ok",
@@ -275,6 +282,9 @@ def test_problem_sensor_marks_cached_backend_state_stale(state, expected):
 
     assert problem.native_value == expected
     assert problem.extra_state_attributes["problem_reason"] == "stale_data"
+    assert (
+        problem.extra_state_attributes["problem_message"] == "Latest reading is stale"
+    )
 
 
 @pytest.mark.parametrize(
@@ -293,6 +303,9 @@ def test_binary_problem_sensor_prefers_backend_dosing_problem_state(state, expec
             dosing_problem={
                 "state": state,
                 "reason": "none" if state == "OK" else "multiple_units",
+                "message": "No dosing problem detected"
+                if state == "OK"
+                else "Multiple dosing units report warnings or errors",
                 "stale": False,
                 "chlorine_status": "ok",
                 "ph_status": "ok",
@@ -309,6 +322,11 @@ def test_binary_problem_sensor_prefers_backend_dosing_problem_state(state, expec
     assert problem.is_on is expected
     assert problem.extra_state_attributes["problem_reason"] == (
         "none" if state == "OK" else "multiple_units"
+    )
+    assert problem.extra_state_attributes["problem_message"] == (
+        "No dosing problem detected"
+        if state == "OK"
+        else "Multiple dosing units report warnings or errors"
     )
 
 
@@ -339,6 +357,7 @@ def test_problem_sensors_fall_back_for_older_backend_dosing_problem_payloads():
     for problem in (enum_problem, binary_problem):
         attributes = problem.extra_state_attributes
         assert attributes["problem_reason"] == "stale_data"
+        assert attributes["problem_message"] == "Latest reading is stale"
         assert attributes["chlorine_status"] == "warning"
         assert attributes["ph_status"] == "ok"
 

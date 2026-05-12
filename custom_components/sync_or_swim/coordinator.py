@@ -87,6 +87,7 @@ def unknown_data() -> SyncOrSwimData:
         "dosing_problem": {
             "state": None,
             "reason": "unknown",
+            "message": "Dosing problem state is unknown",
             "stale": False,
             "chlorine_status": STATUS_UNKNOWN,
             "ph_status": STATUS_UNKNOWN,

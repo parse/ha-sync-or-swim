@@ -18,6 +18,7 @@ def sample_measurement():
         "dosing_problem": {
             "state": "Warning",
             "reason": "ph_warning",
+            "message": "pH status is warning",
             "stale": False,
             "chlorine_status": "ok",
             "ph_status": "warning",
@@ -123,6 +124,7 @@ async def test_get_latest_uses_auth_headers_and_validates_response():
 
     assert data["installation_id"] == "pool-1"
     assert data["dosing_problem"]["reason"] == "ph_warning"
+    assert data["dosing_problem"]["message"] == "pH status is warning"
     assert data["pool"]["chlorine"]["blinking_leds"] == []
     assert FakeSession.calls == [
         (
@@ -191,6 +193,21 @@ async def test_get_latest_defaults_missing_dosing_problem_reason_to_none():
 
 
 @pytest.mark.asyncio
+async def test_get_latest_defaults_missing_dosing_problem_message_to_none():
+    api_client = load_api_client()
+    payload = sample_measurement()
+    payload["dosing_problem"].pop("message")
+    FakeSession.responses = [FakeResponse(payload=payload)]
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example/", "secret", FakeSession()
+    )
+
+    data = await client.get_latest("pool-1")
+
+    assert data["dosing_problem"]["message"] is None
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("reason", ["bad_reason", [], {}])
 async def test_get_latest_rejects_invalid_dosing_problem_reason(reason):
     api_client = load_api_client()
@@ -202,6 +219,20 @@ async def test_get_latest_rejects_invalid_dosing_problem_reason(reason):
     )
 
     with pytest.raises(ValueError, match="dosing_problem.reason"):
+        await client.get_latest("pool-1")
+
+
+@pytest.mark.asyncio
+async def test_get_latest_rejects_invalid_dosing_problem_message_type():
+    api_client = load_api_client()
+    payload = sample_measurement()
+    payload["dosing_problem"]["message"] = []
+    FakeSession.responses = [FakeResponse(payload=payload)]
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example/", "secret", FakeSession()
+    )
+
+    with pytest.raises(ValueError, match="dosing_problem.message"):
         await client.get_latest("pool-1")
 
 

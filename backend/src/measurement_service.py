@@ -80,6 +80,28 @@ def dosing_problem_reason_from_statuses(
     return "unknown"
 
 
+def dosing_problem_message(reason: DosingProblemReasonLiteral) -> str:
+    messages: dict[DosingProblemReasonLiteral, str] = {
+        "stale_data": "Latest reading is stale",
+        "chlorine_error": "Chlorine dosing unit reports an error",
+        "ph_error": "pH dosing unit reports an error",
+        "chlorine_warning": "Chlorine status is warning",
+        "ph_warning": "pH status is warning",
+        "multiple_units": "Multiple dosing units report warnings or errors",
+        "unknown": "Dosing problem state is unknown",
+        "none": "No dosing problem detected",
+    }
+    return messages[reason]
+
+
+def action_required_from_cv(data: CVUnitAnalysisPayload) -> bool:
+    if data["status"] == "error":
+        return True
+    if data["status"] != "warning":
+        return False
+    return data["diagnosis"] not in {"Below target", "Above target"}
+
+
 def recommended_action_from_cv(data: CVUnitAnalysisPayload) -> str:
     status = data["status"]
     if status not in {"warning", "error"}:
@@ -92,9 +114,9 @@ def recommended_action_from_cv(data: CVUnitAnalysisPayload) -> str:
     if mode == "standby":
         return "Unit is in standby. Check that circulation is running."
     if diagnosis == "Below target":
-        return "Value is below target. Check the dosing unit and current pool value."
+        return "Value is below target. Unit may be dosing or waiting for the value to rise."
     if diagnosis == "Above target":
-        return "Value is above target. Check the dosing unit and current pool value."
+        return "Value is above target. Unit may be dosing or waiting for the value to drop."
     return "Check dosing unit LED pattern."
 
 
@@ -121,7 +143,7 @@ def unit_from_cv(data: CVUnitAnalysisPayload) -> UnitAnalysis:
         blinking_leds=led_labels(blinking),
         solid_leds=led_labels(solid_leds),
         summary=summary,
-        action_required=status in {"warning", "error"},
+        action_required=action_required_from_cv(data),
         recommended_action=recommended_action_from_cv(data),
     )
 
@@ -159,6 +181,9 @@ def latest_schema_from_measurement(
     )
     chlorine_status = status_from_db(measurement.chlorine_status)
     ph_status = status_from_db(measurement.ph_status)
+    dosing_problem_reason = dosing_problem_reason_from_statuses(
+        chlorine_status, ph_status, stale
+    )
 
     return LatestMeasurementSchema(
         installation_id=measurement.installation_id,
@@ -188,9 +213,8 @@ def latest_schema_from_measurement(
         ),
         dosing_problem=DosingProblemSchema(
             state=dosing_problem_from_statuses(chlorine_status, ph_status, stale),
-            reason=dosing_problem_reason_from_statuses(
-                chlorine_status, ph_status, stale
-            ),
+            reason=dosing_problem_reason,
+            message=dosing_problem_message(dosing_problem_reason),
             stale=stale,
             chlorine_status=chlorine_status,
             ph_status=ph_status,

@@ -156,6 +156,7 @@ def validate_dosing_problem(data: Any, field_name: str) -> DosingProblem:
         raise ValueError(
             f"Expected '{field_name}.reason' to be one of {VALID_DOSING_PROBLEM_REASONS} or null"
         )
+    _require_nullable_string(data.get("message"), f"{field_name}.message")
     stale = data.get("stale", False)
     _require_type(stale, bool, f"{field_name}.stale")
     chlorine_status = data.get("chlorine_status")
@@ -172,6 +173,7 @@ def validate_dosing_problem(data: Any, field_name: str) -> DosingProblem:
     return {
         "state": cast(DosingProblemState | None, state),
         "reason": cast(DosingProblemReason | None, reason),
+        "message": cast(str | None, data.get("message")),
         "stale": cast(bool, stale),
         "chlorine_status": cast(Status | None, chlorine_status),
         "ph_status": cast(Status | None, ph_status),

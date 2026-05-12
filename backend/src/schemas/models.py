@@ -66,6 +66,7 @@ class PoolAnalysisSchema(BaseModel):
 class DosingProblemSchema(BaseModel):
     state: DosingProblemLiteral | None = None
     reason: DosingProblemReasonLiteral | None = None
+    message: str | None = None
     stale: bool = False
     chlorine_status: StatusLiteral | None = None
     ph_status: StatusLiteral | None = None

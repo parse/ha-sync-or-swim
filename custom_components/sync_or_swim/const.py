@@ -37,4 +37,4 @@ STATUS_ERROR: Final[Literal["error"]] = "error"
 STATUS_UNKNOWN: Final[Literal["unknown"]] = "unknown"
 
 # Platforms
-PLATFORMS = ["sensor", "button", "switch"]
+PLATFORMS = ["sensor", "binary_sensor", "button", "switch"]

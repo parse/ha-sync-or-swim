@@ -6,6 +6,16 @@ from pydantic import BaseModel, Field
 
 StatusLiteral = Literal["ok", "warning", "error", "unknown"]
 DosingProblemLiteral = Literal["OK", "Warning", "Error"]
+DosingProblemReasonLiteral = Literal[
+    "stale_data",
+    "chlorine_error",
+    "ph_error",
+    "chlorine_warning",
+    "ph_warning",
+    "multiple_units",
+    "unknown",
+    "none",
+]
 ModeLiteral = Literal["auto", "standby", "dosing", "error", "unknown", "disabled"]
 
 
@@ -55,6 +65,7 @@ class PoolAnalysisSchema(BaseModel):
 
 class DosingProblemSchema(BaseModel):
     state: DosingProblemLiteral | None = None
+    reason: DosingProblemReasonLiteral | None = None
     stale: bool = False
     chlorine_status: StatusLiteral | None = None
     ph_status: StatusLiteral | None = None

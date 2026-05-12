@@ -18,6 +18,9 @@ if TYPE_CHECKING:
     from .coordinator import SyncOrSwimCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+DOSING_PROBLEM_OK = "OK"
+DOSING_PROBLEM_WARNING = "Warning"
+DOSING_PROBLEM_ERROR = "Error"
 
 
 async def async_setup_entry(
@@ -46,6 +49,17 @@ class SyncOrSwimProblemSensor(CoordinatorEntity, BinarySensorEntity):
         if not data:
             return None
 
+        dosing_problem = data.get("dosing_problem")
+        if dosing_problem:
+            state = dosing_problem.get("state")
+            if state in (DOSING_PROBLEM_WARNING, DOSING_PROBLEM_ERROR):
+                return True
+            if data.get("stale", False):
+                return True
+            if state == DOSING_PROBLEM_OK:
+                return False
+            return None
+
         pool = data.get("pool")
         if not pool:
             return cast(bool | None, data.get("stale", False))
@@ -69,13 +83,22 @@ class SyncOrSwimProblemSensor(CoordinatorEntity, BinarySensorEntity):
             return {}
 
         pool = data.get("pool")
+        dosing_problem = data.get("dosing_problem")
         attributes = {
             "stale": data.get("stale", False),
             "stale_since": data.get("captured_at") if data.get("stale") else None,
             "error": data.get("error"),
+            "problem_reason": dosing_problem.get("reason") if dosing_problem else None,
         }
 
-        if pool:
+        if dosing_problem:
+            attributes.update(
+                {
+                    "chlorine_status": dosing_problem.get("chlorine_status"),
+                    "ph_status": dosing_problem.get("ph_status"),
+                }
+            )
+        elif pool:
             attributes.update(
                 {
                     "chlorine_status": pool["chlorine"]["status"],

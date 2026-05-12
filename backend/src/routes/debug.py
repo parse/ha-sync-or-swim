@@ -52,6 +52,7 @@ async def get_debug_measurement(
         ),
         dosing_problem=DosingProblemSchema(
             state="Warning",
+            reason="ph_warning",
             stale=False,
             chlorine_status="ok",
             ph_status="warning",

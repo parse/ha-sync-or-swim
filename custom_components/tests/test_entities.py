@@ -230,6 +230,7 @@ def test_problem_sensor_uses_backend_dosing_problem_state(state):
         data=coordinator_data(
             dosing_problem={
                 "state": state,
+                "reason": "none" if state == "OK" else "chlorine_warning",
                 "stale": state == "Warning",
                 "chlorine_status": "ok",
                 "ph_status": "ok",
@@ -244,6 +245,9 @@ def test_problem_sensor_uses_backend_dosing_problem_state(state):
     assert problem._attr_device_class == "enum"
     assert problem._attr_options == ["OK", "Warning", "Error"]
     assert problem.native_value == state
+    assert problem.extra_state_attributes["problem_reason"] == (
+        "none" if state == "OK" else "chlorine_warning"
+    )
 
 
 @pytest.mark.parametrize(
@@ -258,6 +262,7 @@ def test_problem_sensor_marks_cached_backend_state_stale(state, expected):
             stale=True,
             dosing_problem={
                 "state": state,
+                "reason": "stale_data",
                 "stale": False,
                 "chlorine_status": "ok",
                 "ph_status": "ok",
@@ -269,6 +274,40 @@ def test_problem_sensor_marks_cached_backend_state_stale(state, expected):
     problem = sensor.SyncOrSwimProblemSensor(coordinator, entry)
 
     assert problem.native_value == expected
+    assert problem.extra_state_attributes["problem_reason"] == "stale_data"
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [("OK", False), ("Warning", True), ("Error", True), (None, None)],
+)
+def test_binary_problem_sensor_prefers_backend_dosing_problem_state(state, expected):
+    binary_sensor = load_module("binary_sensor")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
+    coordinator = SimpleNamespace(
+        data=coordinator_data(
+            pool={
+                "chlorine": {"status": "error"},
+                "ph": {"status": "error"},
+            },
+            dosing_problem={
+                "state": state,
+                "reason": "none" if state == "OK" else "multiple_units",
+                "stale": False,
+                "chlorine_status": "ok",
+                "ph_status": "ok",
+            },
+            stale=False,
+        )
+    )
+    entry.runtime_data = coordinator
+
+    problem = binary_sensor.SyncOrSwimProblemSensor(coordinator, entry)
+
+    assert problem.is_on is expected
+    assert problem.extra_state_attributes["problem_reason"] == (
+        "none" if state == "OK" else "multiple_units"
+    )
 
 
 def test_problem_sensor_does_not_derive_state_without_backend_dosing_problem():

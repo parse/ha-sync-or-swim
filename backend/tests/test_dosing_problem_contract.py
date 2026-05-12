@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from db.models import Measurement
-from measurement_service import latest_schema_from_measurement
+from measurement_service import latest_schema_from_measurement, unit_from_cv
 
 
 def measurement(
@@ -35,25 +35,31 @@ def measurement(
 
 
 @pytest.mark.parametrize(
-    ("chlorine_status", "ph_status", "expected"),
+    ("chlorine_status", "ph_status", "expected_state", "expected_reason"),
     [
-        ("ok", "ok", "OK"),
-        ("warning", "ok", "Warning"),
-        ("ok", "warning", "Warning"),
-        ("error", "ok", "Error"),
-        ("ok", "error", "Error"),
-        ("unknown", "ok", None),
+        ("ok", "ok", "OK", "none"),
+        ("warning", "ok", "Warning", "chlorine_warning"),
+        ("ok", "warning", "Warning", "ph_warning"),
+        ("error", "ok", "Error", "chlorine_error"),
+        ("ok", "error", "Error", "ph_error"),
+        ("error", "warning", "Error", "multiple_units"),
+        ("warning", "warning", "Warning", "multiple_units"),
+        ("unknown", "ok", None, "unknown"),
     ],
 )
 def test_latest_schema_includes_dosing_problem_state(
-    chlorine_status: str, ph_status: str, expected: str | None
+    chlorine_status: str,
+    ph_status: str,
+    expected_state: str | None,
+    expected_reason: str,
 ):
     latest = latest_schema_from_measurement(
         measurement(chlorine_status=chlorine_status, ph_status=ph_status)
     )
 
     assert latest.dosing_problem is not None
-    assert latest.dosing_problem.state == expected
+    assert latest.dosing_problem.state == expected_state
+    assert latest.dosing_problem.reason == expected_reason
     assert latest.dosing_problem.chlorine_status == chlorine_status
     assert latest.dosing_problem.ph_status == ph_status
 
@@ -66,4 +72,80 @@ def test_latest_schema_marks_stale_measurement_as_warning():
 
     assert latest.dosing_problem is not None
     assert latest.dosing_problem.state == "Warning"
+    assert latest.dosing_problem.reason == "stale_data"
     assert latest.dosing_problem.stale is True
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (
+            {
+                "status": "error",
+                "mode": "error",
+                "diagnosis": "Time-out (dosing stopped)",
+                "level": None,
+                "led_states": [False] * 7,
+                "blinking": [1, 2, 3, 5, 6, 7],
+            },
+            "Dosing stopped after timeout. Check the dosing unit and circulation.",
+        ),
+        (
+            {
+                "status": "warning",
+                "mode": "standby",
+                "diagnosis": "Standby mode",
+                "level": 4,
+                "led_states": [False] * 7,
+                "blinking": [4],
+            },
+            "Unit is in standby. Check that circulation is running.",
+        ),
+        (
+            {
+                "status": "warning",
+                "mode": "dosing",
+                "diagnosis": "Below target",
+                "level": 2,
+                "led_states": [False, True, False, False, False, False, False],
+                "blinking": [],
+            },
+            "Value is below target. Check the dosing unit and current pool value.",
+        ),
+        (
+            {
+                "status": "warning",
+                "mode": "dosing",
+                "diagnosis": "Above target",
+                "level": 6,
+                "led_states": [False, False, False, False, False, True, False],
+                "blinking": [],
+            },
+            "Value is above target. Check the dosing unit and current pool value.",
+        ),
+        (
+            {
+                "status": "warning",
+                "mode": "unknown",
+                "diagnosis": "Unknown pattern",
+                "level": None,
+                "led_states": [False] * 7,
+                "blinking": [],
+            },
+            "Check dosing unit LED pattern.",
+        ),
+        (
+            {
+                "status": "ok",
+                "mode": "auto",
+                "diagnosis": "Auto mode",
+                "level": 4,
+                "led_states": [False, False, False, True, False, False, False],
+                "blinking": [],
+            },
+            "",
+        ),
+    ],
+)
+def test_unit_from_cv_recommends_specific_actions(payload, expected):
+    assert unit_from_cv(payload).recommended_action == expected

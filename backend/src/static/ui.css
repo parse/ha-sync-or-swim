@@ -249,6 +249,10 @@ h2 {
   min-width: 0;
 }
 
+.pool-status-details .pool-status-action {
+  grid-column: span 2;
+}
+
 .pool-status-details dt {
   color: #64748b;
   font-size: 12px;
@@ -339,6 +343,10 @@ tr:last-child td {
 
   .pool-status-details {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .pool-status-details .pool-status-action {
+    grid-column: 1 / -1;
   }
 
   input,

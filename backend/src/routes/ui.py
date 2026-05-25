@@ -82,6 +82,19 @@ def render_pool_status_fragment(measurement: Measurement) -> str:
     stale = problem.stale if problem else False
     chlorine_status = problem.chlorine_status if problem else None
     ph_status = problem.ph_status if problem else None
+    action_rows = ""
+    if latest.pool:
+        for label, unit in (
+            ("Chlorine action", latest.pool.chlorine),
+            ("pH action", latest.pool.ph),
+        ):
+            recommended_action = unit.recommended_action.strip()
+            if unit.status in {"warning", "error"} and recommended_action:
+                action_rows += f"""
+    <div class="pool-status-action">
+      <dt>{escape(label)}</dt>
+      <dd>{escape(recommended_action)}</dd>
+    </div>"""
 
     return f"""
 <section class="pool-status" aria-label="Pool status">
@@ -107,6 +120,7 @@ def render_pool_status_fragment(measurement: Measurement) -> str:
       <dt>pH</dt>
       <dd>{escape(ph_status or "unknown")}</dd>
     </div>
+    {action_rows}
   </dl>
 </section>
 """

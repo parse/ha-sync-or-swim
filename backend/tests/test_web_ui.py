@@ -13,6 +13,8 @@ def add_measurement(
     *,
     chlorine_status: str = "ok",
     ph_status: str = "ok",
+    chlorine_recommended: str = "",
+    ph_recommended: str = "",
     captured_at: datetime | None = None,
 ) -> None:
     with SessionLocal() as db:
@@ -29,7 +31,7 @@ def add_measurement(
                 chlorine_solid=[],
                 chlorine_summary="Chlorine summary",
                 chlorine_action=chlorine_status in {"warning", "error"},
-                chlorine_recommended="",
+                chlorine_recommended=chlorine_recommended,
                 ph_status=ph_status,
                 ph_diagnosis=None,
                 ph_pattern="auto",
@@ -37,7 +39,7 @@ def add_measurement(
                 ph_solid=[],
                 ph_summary="pH summary",
                 ph_action=ph_status in {"warning", "error"},
-                ph_recommended="",
+                ph_recommended=ph_recommended,
                 raw_response=None,
             )
         )
@@ -146,7 +148,10 @@ def test_share_qr_fragment_returns_ui_error_for_bad_installation_id():
 
 
 def test_latest_pool_status_fragment_returns_status_panel():
-    add_measurement(ph_status="warning")
+    add_measurement(
+        ph_status="warning",
+        ph_recommended="Value is below target. Unit is waiting for the value to rise.",
+    )
 
     response = client.get(
         "/ui/pool-status/latest-fragment",
@@ -160,7 +165,71 @@ def test_latest_pool_status_fragment_returns_status_panel():
     assert "Warning" in response.text
     assert "Chlorine" in response.text
     assert "pH" in response.text
+    assert "pH action" in response.text
+    assert (
+        "Value is below target. Unit is waiting for the value to rise." in response.text
+    )
     assert "<time datetime=" in response.text
+
+
+def test_latest_pool_status_fragment_returns_error_recommended_action():
+    add_measurement(
+        chlorine_status="error",
+        chlorine_recommended=(
+            "Dosing stopped after timeout. Check the dosing unit and circulation."
+        ),
+    )
+
+    response = client.get(
+        "/ui/pool-status/latest-fragment",
+        params={"installation_id": "test-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "Error" in response.text
+    assert "Chlorine action" in response.text
+    assert (
+        "Dosing stopped after timeout. Check the dosing unit and circulation."
+        in response.text
+    )
+
+
+def test_latest_pool_status_fragment_hides_ok_recommended_action():
+    add_measurement(
+        chlorine_status="ok",
+        chlorine_recommended="Do not show this for OK units.",
+        ph_status="ok",
+        ph_recommended="Do not show this either.",
+    )
+
+    response = client.get(
+        "/ui/pool-status/latest-fragment",
+        params={"installation_id": "test-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "Chlorine action" not in response.text
+    assert "pH action" not in response.text
+    assert "Do not show this" not in response.text
+
+
+def test_latest_pool_status_fragment_escapes_recommended_action():
+    add_measurement(
+        ph_status="warning",
+        ph_recommended="<script>alert(1)</script>",
+    )
+
+    response = client.get(
+        "/ui/pool-status/latest-fragment",
+        params={"installation_id": "test-installation"},
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+
+    assert response.status_code == 200
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in response.text
+    assert "<script>alert(1)</script>" not in response.text
 
 
 def test_latest_pool_status_fragment_returns_stale_warning():

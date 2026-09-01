@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 import sys
 import types
@@ -689,10 +690,11 @@ def producer_entry(**overrides):
 
 
 class FakeApiClient:
-    def __init__(self, backend_url, token, session):
+    def __init__(self, backend_url, token, session, **kwargs):
         self.backend_url = backend_url
         self.token = token
         self.session = session
+        self.kwargs = kwargs
         self.shared_sensor_calls = []
         self.analyze_calls = []
 
@@ -729,8 +731,8 @@ def make_hass(states=None):
 def install_fake_api(monkeypatch, coordinator):
     clients = []
 
-    def fake_client(*args):
-        client = FakeApiClient(*args)
+    def fake_client(*args, **kwargs):
+        client = FakeApiClient(*args, **kwargs)
         clients.append(client)
         return client
 
@@ -801,6 +803,36 @@ async def test_shared_sensor_push_sends_available_value_and_skips_unavailable(
             ],
         )
     ]
+
+
+@pytest.mark.asyncio
+async def test_concurrent_shared_sensor_push_skips_overlap(monkeypatch):
+    coordinator = load_module("coordinator")
+    clients = install_fake_api(monkeypatch, coordinator)
+    hass = make_hass(
+        {
+            "sensor.pool": SimpleNamespace(
+                state="12.3", attributes={"friendly_name": "Pool"}
+            )
+        }
+    )
+    producer = coordinator.ProducerCoordinator(hass, producer_entry())
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def blocked_push(installation_id, sensors):
+        started.set()
+        await release.wait()
+        clients[0].shared_sensor_calls.append((installation_id, sensors))
+
+    clients[0].push_shared_sensors = blocked_push
+    first = asyncio.create_task(producer._async_push_shared_sensor("sensor.pool"))
+    await started.wait()
+    await producer._async_push_shared_sensor("sensor.pool")
+    release.set()
+    await first
+
+    assert len(clients[0].shared_sensor_calls) == 1
 
 
 @pytest.mark.asyncio

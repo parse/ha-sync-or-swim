@@ -1,7 +1,10 @@
 import os
 from collections.abc import Iterator
+from time import perf_counter
 from typing import Any
 
+from fastapi import Request
+from request_timing import elapsed_ms, log_timing
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -26,9 +29,17 @@ engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db() -> Iterator[Session]:
+def get_db(request: Request) -> Iterator[Session]:
+    started = perf_counter()
     db = SessionLocal()
     try:
+        db.connection()
+        log_timing(
+            "database_acquisition",
+            installation_id=request.path_params.get("installation_id", "unknown"),
+            duration_ms=elapsed_ms(started),
+            pool_status=engine.pool.status(),
+        )
         yield db
     finally:
         db.close()

@@ -1,8 +1,10 @@
+import asyncio
 import importlib
 import sys
 import types
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -54,12 +56,20 @@ class FakeFormData:
 
 
 class FakeResponse:
-    def __init__(self, status=200, payload=None, text=""):
+    def __init__(
+        self, status=200, payload=None, text="", enter_error=None, enter_delay=0
+    ):
         self.status = status
         self._payload = payload if payload is not None else sample_measurement()
         self._text = text
+        self._enter_error = enter_error
+        self._enter_delay = enter_delay
 
     async def __aenter__(self):
+        if self._enter_delay:
+            await asyncio.sleep(self._enter_delay)
+        if self._enter_error:
+            raise self._enter_error
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
@@ -95,6 +105,14 @@ def load_api_client():
     aiohttp = types.ModuleType("aiohttp")
     aiohttp.ClientSession = FakeSession
     aiohttp.FormData = FakeFormData
+    aiohttp.ClientConnectionError = type("ClientConnectionError", (Exception,), {})
+
+    class ClientTimeout:
+        def __init__(self, *, connect, total):
+            self.connect = connect
+            self.total = total
+
+    aiohttp.ClientTimeout = ClientTimeout
     sys.modules["aiohttp"] = aiohttp
 
     package = types.ModuleType("custom_components.sync_or_swim")
@@ -110,6 +128,90 @@ def load_api_client():
     FakeSession.calls = []
     FakeSession.responses = []
     return importlib.import_module("custom_components.sync_or_swim.api_client")
+
+
+@pytest.mark.asyncio
+async def test_sensor_push_allows_response_longer_than_old_ten_second_budget():
+    api_client = load_api_client()
+    FakeSession.responses = [FakeResponse(enter_delay=0.01)]
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession()
+    )
+
+    await client.push_shared_sensors("pool-1", [{"key": "sensor.pool"}])
+
+    timeout = FakeSession.calls[0][2]["timeout"]
+    assert timeout.connect == 10
+    assert timeout.total == 30
+
+
+@pytest.mark.asyncio
+async def test_sensor_push_retries_timeout_then_succeeds(monkeypatch):
+    api_client = load_api_client()
+    FakeSession.responses = [
+        FakeResponse(enter_error=TimeoutError()),
+        FakeResponse(),
+    ]
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession()
+    )
+    sleep = AsyncMock()
+    monkeypatch.setattr(api_client.asyncio, "sleep", sleep)
+
+    await client.push_shared_sensors("pool-1", [{"key": "sensor.pool"}])
+
+    assert len(FakeSession.calls) == 2
+    assert sleep.await_count == 1
+    assert (
+        FakeSession.calls[0][2]["headers"]["Idempotency-Key"]
+        == FakeSession.calls[1][2]["headers"]["Idempotency-Key"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_sensor_push_retries_cold_start_503(monkeypatch):
+    api_client = load_api_client()
+    FakeSession.responses = [FakeResponse(status=503), FakeResponse()]
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession()
+    )
+    monkeypatch.setattr(api_client.asyncio, "sleep", AsyncMock())
+
+    await client.push_shared_sensors("pool-1", [{"key": "sensor.pool"}])
+
+    assert len(FakeSession.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_sensor_push_does_not_retry_permanent_4xx(monkeypatch):
+    api_client = load_api_client()
+    FakeSession.responses = [FakeResponse(status=400, text="invalid")]
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession()
+    )
+    sleep = AsyncMock()
+    monkeypatch.setattr(api_client.asyncio, "sleep", sleep)
+
+    with pytest.raises(api_client.SyncOrSwimApiError, match="400 invalid"):
+        await client.push_shared_sensors("pool-1", [{"key": "sensor.pool"}])
+
+    assert len(FakeSession.calls) == 1
+    sleep.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_sensor_push_retry_delay_caps_jittered_total(monkeypatch):
+    api_client = load_api_client()
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession()
+    )
+    sleep = AsyncMock()
+    monkeypatch.setattr(api_client.asyncio, "sleep", sleep)
+    monkeypatch.setattr(api_client.random, "uniform", lambda start, end: 0.5)
+
+    await client._retry_delay(10)
+
+    sleep.assert_awaited_once_with(8.0)
 
 
 @pytest.mark.asyncio

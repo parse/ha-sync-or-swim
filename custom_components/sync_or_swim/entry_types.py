@@ -27,6 +27,8 @@ class SyncOrSwimConfigEntryOptions(TypedDict, total=False):
     scan_interval: int
     poll_interval: int
     staleness_threshold: int
+    sensor_push_connect_timeout: int
+    sensor_push_total_timeout: int
 
 
 class SyncOrSwimConfigEntry(ConfigEntry):

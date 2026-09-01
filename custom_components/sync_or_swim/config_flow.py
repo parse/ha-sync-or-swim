@@ -19,12 +19,16 @@ from .const import (
     CONF_PUSH_TOKEN,
     CONF_ROLE,
     CONF_SCAN_INTERVAL,
+    CONF_SENSOR_PUSH_CONNECT_TIMEOUT,
+    CONF_SENSOR_PUSH_TOTAL_TIMEOUT,
     CONF_SHARED_SENSOR_INTERVALS,
     CONF_SHARED_SENSORS,
     CONF_STALENESS_THRESHOLD,
     DEFAULT_INSTALLATION_ENABLED,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SENSOR_PUSH_CONNECT_TIMEOUT,
+    DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
     INSTALLATION_ID_PATTERN,
@@ -335,6 +339,22 @@ def _options_schema(entry: config_entries.ConfigEntry) -> vol.Schema:
                         entry, CONF_SHARED_SENSOR_INTERVALS, ""
                     ),
                 ): selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
+                vol.Optional(
+                    CONF_SENSOR_PUSH_CONNECT_TIMEOUT,
+                    default=effective_entry_value(
+                        entry,
+                        CONF_SENSOR_PUSH_CONNECT_TIMEOUT,
+                        DEFAULT_SENSOR_PUSH_CONNECT_TIMEOUT,
+                    ),
+                ): int,
+                vol.Optional(
+                    CONF_SENSOR_PUSH_TOTAL_TIMEOUT,
+                    default=effective_entry_value(
+                        entry,
+                        CONF_SENSOR_PUSH_TOTAL_TIMEOUT,
+                        DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
+                    ),
+                ): int,
             }
         )
     else:

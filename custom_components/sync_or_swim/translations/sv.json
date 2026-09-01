@@ -59,7 +59,9 @@
           "staleness_threshold": "Maximal dataålder (minuter)",
           "installation_enabled": "Installation aktiverad",
           "shared_sensors": "Sensorer att dela",
-          "shared_sensor_intervals": "Intervall för delade sensorer"
+          "shared_sensor_intervals": "Intervall för delade sensorer",
+          "sensor_push_connect_timeout": "Anslutningstimeout för sensoruppladdning (sekunder)",
+          "sensor_push_total_timeout": "Total timeout för sensoruppladdning (sekunder)"
         }
       }
     },

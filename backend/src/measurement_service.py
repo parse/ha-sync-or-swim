@@ -17,6 +17,8 @@ from schemas.models import (
     StatusLiteral,
     UnitAnalysis,
 )
+from sqlalchemy.dialects.postgresql import insert as postgresql_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 
@@ -296,6 +298,34 @@ def store_shared_sensors(
     now = datetime.now(timezone.utc)
 
     query_started = perf_counter()
+    if db.get_bind().dialect.name in {"postgresql", "sqlite"}:
+        _upsert_shared_sensors(db, installation_id, updates, now)
+        log_timing(
+            "sensor_database_queries",
+            installation_id=installation_id,
+            duration_ms=elapsed_ms(query_started),
+            update_count=len(updates),
+            write_strategy="atomic_upsert",
+        )
+        commit_started = perf_counter()
+        db.commit()
+        log_timing(
+            "sensor_database_commit",
+            installation_id=installation_id,
+            duration_ms=elapsed_ms(commit_started),
+        )
+        refresh_started = perf_counter()
+        installation = db.get(Installation, installation_id)
+        if installation is None:
+            raise RuntimeError("Installation missing after shared sensor upsert")
+        sensors = installation.shared_sensors
+        log_timing(
+            "sensor_database_refresh",
+            installation_id=installation_id,
+            duration_ms=elapsed_ms(refresh_started),
+        )
+        return sensors
+
     installation = db.get(Installation, installation_id)
     if installation is None:
         installation = Installation(id=installation_id, last_seen=now)
@@ -355,6 +385,51 @@ def store_shared_sensors(
         duration_ms=elapsed_ms(refresh_started),
     )
     return sensors
+
+
+def _upsert_shared_sensors(
+    db: Session,
+    installation_id: str,
+    updates: list[SharedSensorUpdateSchema],
+    now: datetime,
+) -> None:
+    """Atomically store sensors so concurrent retries cannot race on inserts."""
+    insert = (
+        postgresql_insert
+        if db.get_bind().dialect.name == "postgresql"
+        else sqlite_insert
+    )
+    installation_insert = insert(Installation).values(id=installation_id, last_seen=now)
+    db.execute(
+        installation_insert.on_conflict_do_update(
+            index_elements=[Installation.id], set_={"last_seen": now}
+        )
+    )
+
+    for update in updates:
+        sensor_insert = insert(SharedSensor).values(
+            installation_id=installation_id,
+            key=update.key,
+            label=update.label,
+            value=update.value,
+            unit=update.unit,
+            device_class=update.device_class,
+            state_class=update.state_class,
+            updated_at=now,
+        )
+        db.execute(
+            sensor_insert.on_conflict_do_update(
+                index_elements=[SharedSensor.installation_id, SharedSensor.key],
+                set_={
+                    "label": update.label,
+                    "value": update.value,
+                    "unit": update.unit,
+                    "device_class": update.device_class,
+                    "state_class": update.state_class,
+                    "updated_at": now,
+                },
+            )
+        )
 
 
 def store_disabled_measurement(

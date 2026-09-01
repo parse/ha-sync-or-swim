@@ -5,7 +5,8 @@ from time import perf_counter
 from auth import verify_token, verify_web_ui_token
 from db.models import Installation, SharedSensor
 from db.session import get_db
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from idempotency import sensor_request_lock
 from measurement_service import (
     shared_sensor_display_label,
     store_disabled_measurement,
@@ -173,6 +174,7 @@ def update_sensors(
     updates: list[SharedSensorUpdateSchema],
     db: Session = Depends(get_db),
     _auth: None = Depends(verify_token),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> list[SharedSensorSchema]:
     validation_started = perf_counter()
     try:
@@ -187,7 +189,9 @@ def update_sensors(
     )
 
     write_started = perf_counter()
-    sensors = store_shared_sensors(db, installation_id, updates)
+    lock_key = idempotency_key or ",".join(sorted(update.key for update in updates))
+    with sensor_request_lock(installation_id, lock_key):
+        sensors = store_shared_sensors(db, installation_id, updates)
     log_timing(
         "sensor_database_write",
         installation_id=installation_id,

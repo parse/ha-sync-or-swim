@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 from db.models import Installation, Measurement, SharedSensor
@@ -352,6 +353,38 @@ def test_replayed_sensor_update_is_idempotent():
         assert (
             db.query(SharedSensor)
             .filter(SharedSensor.key == "sensor.pool_temperature")
+            .count()
+            == 1
+        )
+
+
+def test_concurrent_retried_sensor_update_is_idempotent():
+    payload = [
+        {
+            "key": "sensor.concurrent_temperature",
+            "label": "Concurrent temperature",
+            "value": "12.3",
+        }
+    ]
+
+    def post_update():
+        return client.post(
+            "/api/installations/test-installation/sensors",
+            headers={
+                "Authorization": "Bearer test-token",
+                "Idempotency-Key": "concurrent-request",
+            },
+            json=payload,
+        )
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        responses = list(executor.map(lambda _: post_update(), range(3)))
+
+    assert [response.status_code for response in responses] == [200, 200, 200]
+    with SessionLocal() as db:
+        assert (
+            db.query(SharedSensor)
+            .filter(SharedSensor.key == "sensor.concurrent_temperature")
             .count()
             == 1
         )

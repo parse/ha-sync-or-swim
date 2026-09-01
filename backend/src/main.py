@@ -46,7 +46,7 @@ async def log_sensor_request_timing(request: Request, call_next):  # type: ignor
     )
     try:
         response = await call_next(request)
-    except BaseException as exc:
+    except Exception as exc:
         log_timing(
             "sensor_request_failed",
             installation_id=installation_id,

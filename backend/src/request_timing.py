@@ -7,7 +7,7 @@ _LOGGER = logging.getLogger("sync_or_swim.request_timing")
 
 
 def log_timing(event: str, **fields: Any) -> None:
-    """Write a queryable timing event without request credentials or values."""
+    """Write a queryable timing event without credentials or sensor readings."""
     _LOGGER.info("%s", json.dumps({"event": event, **fields}, default=str))
 
 

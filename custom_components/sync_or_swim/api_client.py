@@ -175,7 +175,8 @@ class SyncOrSwimApiClient:
 
     async def _retry_delay(self, attempt: int) -> None:
         """Wait using capped exponential backoff with jitter."""
-        await asyncio.sleep(min(8.0, 2 ** (attempt - 1)) + random.uniform(0, 0.5))
+        delay = min(8.0, 2 ** (attempt - 1) + random.uniform(0, 0.5))
+        await asyncio.sleep(delay)
 
     def _log_sensor_push(
         self,

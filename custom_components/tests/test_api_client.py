@@ -200,6 +200,21 @@ async def test_sensor_push_does_not_retry_permanent_4xx(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_sensor_push_retry_delay_caps_jittered_total(monkeypatch):
+    api_client = load_api_client()
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession()
+    )
+    sleep = AsyncMock()
+    monkeypatch.setattr(api_client.asyncio, "sleep", sleep)
+    monkeypatch.setattr(api_client.random, "uniform", lambda start, end: 0.5)
+
+    await client._retry_delay(10)
+
+    sleep.assert_awaited_once_with(8.0)
+
+
+@pytest.mark.asyncio
 async def test_get_latest_uses_auth_headers_and_validates_response():
     api_client = load_api_client()
     FakeSession.responses = [FakeResponse(payload=sample_measurement())]

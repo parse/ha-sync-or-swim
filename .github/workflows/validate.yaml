@@ -44,7 +44,7 @@ jobs:
         id: python-version
         run: echo "version=$(awk '$1 == \"python\" { print $2 }' .tool-versions)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ steps.python-version.outputs.version }}
           cache: pip

@@ -10,10 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Check whether base branch has a license
+        id: base-license
+        run: |
+          if git cat-file -e "${{ github.event.pull_request.base.sha }}:LICENSE"; then
+            echo "ignore=" >> "$GITHUB_OUTPUT"
+          else
+            # HACS reads license metadata from the default branch, so a license
+            # introduced by this PR is not visible to its validator until merge.
+            echo "ignore=license" >> "$GITHUB_OUTPUT"
+          fi
       - name: HACS validation
         uses: hacs/action@main
         with:
           category: integration
+          ignore: ${{ steps.base-license.outputs.ignore }}
 
   validate-hassfest:
     runs-on: ubuntu-latest

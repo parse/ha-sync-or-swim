@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
+from time import perf_counter
 from typing import cast
 
 from db.models import Installation, Measurement, SharedSensor
+from request_timing import elapsed_ms, log_timing
 from schemas.models import (
     CVAnalysisResult,
     CVUnitAnalysisPayload,
@@ -293,6 +295,7 @@ def store_shared_sensors(
 ) -> list[SharedSensor]:
     now = datetime.now(timezone.utc)
 
+    query_started = perf_counter()
     installation = db.get(Installation, installation_id)
     if installation is None:
         installation = Installation(id=installation_id, last_seen=now)
@@ -330,9 +333,28 @@ def store_shared_sensors(
             )
             db.add(new_sensor)
 
+    log_timing(
+        "sensor_database_queries",
+        installation_id=installation_id,
+        duration_ms=elapsed_ms(query_started),
+        update_count=len(updates),
+    )
+    commit_started = perf_counter()
     db.commit()
+    log_timing(
+        "sensor_database_commit",
+        installation_id=installation_id,
+        duration_ms=elapsed_ms(commit_started),
+    )
+    refresh_started = perf_counter()
     db.refresh(installation)
-    return installation.shared_sensors
+    sensors = installation.shared_sensors
+    log_timing(
+        "sensor_database_refresh",
+        installation_id=installation_id,
+        duration_ms=elapsed_ms(refresh_started),
+    )
+    return sensors
 
 
 def store_disabled_measurement(

@@ -57,7 +57,9 @@
           "staleness_threshold": "Staleness threshold (minutes)",
           "installation_enabled": "Installation enabled",
           "shared_sensors": "Sensors to share",
-          "shared_sensor_intervals": "Shared sensor intervals"
+          "shared_sensor_intervals": "Shared sensor intervals",
+          "sensor_push_connect_timeout": "Sensor upload connect timeout (seconds)",
+          "sensor_push_total_timeout": "Sensor upload total timeout (seconds)"
         },
         "description": "Set shared sensor intervals as one entity_id=minutes entry per line."
       }

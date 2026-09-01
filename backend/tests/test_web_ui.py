@@ -328,6 +328,35 @@ def test_latest_sensors_accepts_web_ui_token():
     ]
 
 
+def test_replayed_sensor_update_is_idempotent():
+    payload = [
+        {
+            "key": "sensor.pool_temperature",
+            "label": "Pool temperature",
+            "value": "12.3",
+        }
+    ]
+
+    for _ in range(2):
+        response = client.post(
+            "/api/installations/test-installation/sensors",
+            headers={
+                "Authorization": "Bearer test-token",
+                "Idempotency-Key": "same-request",
+            },
+            json=payload,
+        )
+        assert response.status_code == 200
+
+    with SessionLocal() as db:
+        assert (
+            db.query(SharedSensor)
+            .filter(SharedSensor.key == "sensor.pool_temperature")
+            .count()
+            == 1
+        )
+
+
 def test_latest_sensors_fragment_returns_sensor_table():
     client.post(
         "/api/installations/test-installation/sensors",

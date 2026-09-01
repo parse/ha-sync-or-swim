@@ -1,5 +1,6 @@
 from datetime import timezone
 from html import escape
+from time import perf_counter
 
 from auth import verify_token, verify_web_ui_token
 from db.models import Installation, SharedSensor
@@ -10,6 +11,7 @@ from measurement_service import (
     store_disabled_measurement,
     store_shared_sensors,
 )
+from request_timing import elapsed_ms, log_timing
 from schemas.models import (
     InstallationResponseSchema,
     LatestMeasurementSchema,
@@ -166,16 +168,38 @@ async def disable_installation(
 
 
 @router.post("/{installation_id}/sensors", response_model=list[SharedSensorSchema])
-async def update_sensors(
+def update_sensors(
     installation_id: str,
     updates: list[SharedSensorUpdateSchema],
     db: Session = Depends(get_db),
     _auth: None = Depends(verify_token),
 ) -> list[SharedSensorSchema]:
+    validation_started = perf_counter()
     try:
         validate_installation_id(installation_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    log_timing(
+        "sensor_request_validation",
+        installation_id=installation_id,
+        sensor_entity_ids=",".join(update.key for update in updates),
+        duration_ms=elapsed_ms(validation_started),
+    )
 
+    write_started = perf_counter()
     sensors = store_shared_sensors(db, installation_id, updates)
-    return [shared_sensor_schema_from_model(s) for s in sensors]
+    log_timing(
+        "sensor_database_write",
+        installation_id=installation_id,
+        sensor_entity_ids=",".join(update.key for update in updates),
+        duration_ms=elapsed_ms(write_started),
+        external_call_ms=0,
+    )
+    response_started = perf_counter()
+    response = [shared_sensor_schema_from_model(s) for s in sensors]
+    log_timing(
+        "sensor_response_serialization",
+        installation_id=installation_id,
+        duration_ms=elapsed_ms(response_started),
+    )
+    return response

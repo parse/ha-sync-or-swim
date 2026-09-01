@@ -27,10 +27,14 @@ from .const import (
     CONF_POLL_INTERVAL,
     CONF_PUSH_TOKEN,
     CONF_SCAN_INTERVAL,
+    CONF_SENSOR_PUSH_CONNECT_TIMEOUT,
+    CONF_SENSOR_PUSH_TOTAL_TIMEOUT,
     CONF_STALENESS_THRESHOLD,
     DEFAULT_INSTALLATION_ENABLED,
     DEFAULT_POLL_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_SENSOR_PUSH_CONNECT_TIMEOUT,
+    DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
     LIGHT_WARMUP_SECONDS,
@@ -140,6 +144,16 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
             effective_entry_value(entry, CONF_BACKEND_URL, entry_data["backend_url"]),
             effective_entry_value(entry, CONF_PUSH_TOKEN, entry_data.get("push_token")),
             async_get_clientsession(hass),
+            sensor_push_connect_timeout=effective_entry_value(
+                entry,
+                CONF_SENSOR_PUSH_CONNECT_TIMEOUT,
+                DEFAULT_SENSOR_PUSH_CONNECT_TIMEOUT,
+            ),
+            sensor_push_total_timeout=effective_entry_value(
+                entry,
+                CONF_SENSOR_PUSH_TOTAL_TIMEOUT,
+                DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
+            ),
         )
         self._setup_shared_sensor_timers()
 
@@ -260,7 +274,12 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
 
             lock = self._shared_sensor_locks.setdefault(entity_id, asyncio.Lock())
             if lock.locked():
-                _LOGGER.debug("Shared sensor push already running for %s", entity_id)
+                _LOGGER.warning(
+                    "Shared sensor push skipped installation_id=%s "
+                    "sensor_entity_id=%s failure_category=overlap",
+                    self._installation_id,
+                    entity_id,
+                )
                 return
 
             async with lock:

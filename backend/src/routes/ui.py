@@ -1,25 +1,92 @@
-from datetime import timezone
 from html import escape
 from urllib.parse import urlencode
 
 import qrcode
 import qrcode.image.svg
 from auth import verify_web_ui_token
-from db.models import Installation, Measurement
+from db.models import Installation, Measurement, SharedSensor
 from db.session import get_db
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import HTMLResponse
-from measurement_service import latest_schema_from_measurement
-from routes.installations import (
+from measurement_service import (
+    as_utc,
+    latest_measurement,
+    latest_schema_from_measurement,
     latest_sensors_for_installation,
-    render_error_fragment,
-    render_sensors_fragment,
+    shared_sensor_display_label,
 )
 from schemas.models import validate_installation_id
 from sqlalchemy.orm import Session
 
 router = APIRouter()
 WEB_UI_STALENESS_THRESHOLD_MINUTES = 120
+
+
+def render_sensors_fragment(sensors: list[SharedSensor]) -> str:
+    if not sensors:
+        return """
+<p class="status">No shared sensors found.</p>
+<table>
+  <thead>
+    <tr>
+      <th>Sensor</th>
+      <th>Value</th>
+      <th>Updated</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td colspan="3">No shared sensors found.</td></tr>
+  </tbody>
+</table>
+"""
+
+    rows = []
+    for sensor in sensors:
+        value = f"{sensor.value} {sensor.unit}" if sensor.unit else sensor.value
+        updated_at = as_utc(sensor.updated_at).isoformat() if sensor.updated_at else ""
+        updated = (
+            f'<time datetime="{escape(updated_at)}">{escape(updated_at)}</time>'
+            if updated_at
+            else ""
+        )
+        rows.append(
+            "<tr>"
+            f'<td data-label="Sensor">'
+            f"{escape(shared_sensor_display_label(sensor))}</td>"
+            f'<td data-label="Value" class="value">{escape(value)}</td>'
+            f'<td data-label="Updated">{updated}</td>'
+            "</tr>"
+        )
+
+    return f"""
+<p class="status">Last fetched now</p>
+<table>
+  <thead>
+    <tr>
+      <th>Sensor</th>
+      <th>Value</th>
+      <th>Updated</th>
+    </tr>
+  </thead>
+  <tbody>
+    {"".join(rows)}
+  </tbody>
+</table>
+"""
+
+
+def render_error_fragment(message: str) -> str:
+    return f"""
+<p class="status error">{escape(message)}</p>
+"""
+
+
+def invalid_installation_id_fragment(installation_id: str) -> HTMLResponse | None:
+    try:
+        validate_installation_id(installation_id)
+    except ValueError:
+        return HTMLResponse(render_error_fragment("Invalid installation ID"))
+    return None
 
 
 def bearer_token_from_authorization(authorization: str | None) -> str:
@@ -67,12 +134,7 @@ def render_pool_status_fragment(measurement: Measurement) -> str:
     state = problem.state if problem else None
     state_label = state or "Unknown"
     state_class = state_label.lower()
-    captured_at_value = latest.captured_at
-    if captured_at_value and (
-        captured_at_value.tzinfo is None or captured_at_value.utcoffset() is None
-    ):
-        captured_at_value = captured_at_value.replace(tzinfo=timezone.utc)
-    captured_at = captured_at_value.isoformat() if captured_at_value else ""
+    captured_at = as_utc(latest.captured_at).isoformat() if latest.captured_at else ""
     captured = (
         f'<time datetime="{escape(captured_at)}">{escape(captured_at)}</time>'
         if captured_at
@@ -131,21 +193,14 @@ def get_latest_pool_status_fragment(
     _auth: None = Depends(verify_web_ui_token),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    try:
-        validate_installation_id(installation_id)
-    except ValueError:
-        return HTMLResponse(render_error_fragment("Invalid installation ID"))
+    if (error := invalid_installation_id_fragment(installation_id)) is not None:
+        return error
 
     installation = db.get(Installation, installation_id)
     if installation is None:
         return HTMLResponse(render_error_fragment("Installation not found."))
 
-    measurement = (
-        db.query(Measurement)
-        .filter(Measurement.installation_id == installation_id)
-        .order_by(Measurement.captured_at.desc())
-        .first()
-    )
+    measurement = latest_measurement(db, installation_id)
     if measurement is None:
         return HTMLResponse(render_error_fragment("No measurements found."))
 
@@ -158,10 +213,8 @@ def get_latest_sensors_fragment(
     _auth: None = Depends(verify_web_ui_token),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
-    try:
-        validate_installation_id(installation_id)
-    except ValueError:
-        return HTMLResponse(render_error_fragment("Invalid installation ID"))
+    if (error := invalid_installation_id_fragment(installation_id)) is not None:
+        return error
 
     installation = db.get(Installation, installation_id)
     if installation is None:
@@ -178,10 +231,8 @@ def get_share_qr_fragment(
     authorization: str | None = Header(None),
     _auth: None = Depends(verify_web_ui_token),
 ) -> HTMLResponse:
-    try:
-        validate_installation_id(installation_id)
-    except ValueError:
-        return HTMLResponse(render_error_fragment("Invalid installation ID"))
+    if (error := invalid_installation_id_fragment(installation_id)) is not None:
+        return error
 
     return HTMLResponse(
         render_share_qr_fragment(

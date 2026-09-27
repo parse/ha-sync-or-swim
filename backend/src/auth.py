@@ -17,33 +17,27 @@ def verify_token(request: Request, authorization: str | None = Header(None)) -> 
     started = perf_counter()
     expected_token = os.environ.get("PUSH_TOKEN")
     if not expected_token:
-        log_timing(
-            "request_authentication",
-            installation_id=request.path_params.get("installation_id", "unknown"),
-            duration_ms=elapsed_ms(started),
-            result="server_misconfigured",
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="PUSH_TOKEN not configured on server",
-        )
-
-    if not bearer_token_matches(authorization, expected_token):
-        log_timing(
-            "request_authentication",
-            installation_id=request.path_params.get("installation_id", "unknown"),
-            duration_ms=elapsed_ms(started),
-            result="unauthorized",
-        )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
-        )
+        result = "server_misconfigured"
+    elif not bearer_token_matches(authorization, expected_token):
+        result = "unauthorized"
+    else:
+        result = "success"
     log_timing(
         "request_authentication",
         installation_id=request.path_params.get("installation_id", "unknown"),
         duration_ms=elapsed_ms(started),
-        result="success",
+        result=result,
     )
+
+    if result == "server_misconfigured":
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="PUSH_TOKEN not configured on server",
+        )
+    if result == "unauthorized":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
 
 
 def verify_web_ui_token(authorization: str | None = Header(None)) -> None:

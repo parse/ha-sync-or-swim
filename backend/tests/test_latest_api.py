@@ -50,3 +50,20 @@ def test_latest_rejects_negative_staleness_threshold():
     assert response.json()["detail"] == (
         "staleness_threshold_minutes must be non-negative"
     )
+
+
+def test_latest_checks_auth_before_installation_id():
+    response = client.get("/api/latest/Bad_Installation")
+
+    assert response.status_code == 401
+
+
+def test_latest_rejects_bad_installation_id_before_query_validation():
+    response = client.get(
+        "/api/latest/Bad_Installation",
+        params={"staleness_threshold_minutes": "abc"},
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid installation ID"

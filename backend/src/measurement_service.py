@@ -44,13 +44,18 @@ def status_from_db(value: str) -> StatusLiteral:
     return "unknown"
 
 
+def as_utc(value: datetime) -> datetime:
+    """Treat naive datetimes from the database as UTC."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
 def compute_stale(captured_at: datetime | None, threshold_minutes: int) -> bool:
     if captured_at is None:
         return False
-    if captured_at.tzinfo is None:
-        captured_at = captured_at.replace(tzinfo=timezone.utc)
     return (
-        datetime.now(tz=timezone.utc) - captured_at
+        datetime.now(tz=timezone.utc) - as_utc(captured_at)
     ).total_seconds() > threshold_minutes * 60
 
 
@@ -179,26 +184,9 @@ def latest_schema_from_measurement(
     *,
     staleness_threshold_minutes: int | None = None,
 ) -> LatestMeasurementSchema:
-    sensor_schemas = []
-    if sensors:
-        sorted_sensors = sorted(
-            sensors,
-            key=lambda sensor: (shared_sensor_display_label(sensor), sensor.key),
-        )
-        for s in sorted_sensors:
-            sensor_schemas.append(
-                SharedSensorSchema(
-                    key=s.key,
-                    label=shared_sensor_display_label(s),
-                    preferred_alias=s.preferred_alias,
-                    value=s.value,
-                    unit=s.unit,
-                    device_class=s.device_class,
-                    state_class=s.state_class,
-                    updated_at=s.updated_at,
-                )
-            )
-
+    sensor_schemas = [
+        shared_sensor_schema(sensor) for sensor in sort_shared_sensors(sensors or [])
+    ]
     stale = (
         compute_stale(measurement.captured_at, staleness_threshold_minutes)
         if staleness_threshold_minutes is not None
@@ -246,6 +234,45 @@ def latest_schema_from_measurement(
         ),
         sensors=sensor_schemas,
         raw_response=measurement.raw_response,
+    )
+
+
+def latest_measurement(db: Session, installation_id: str) -> Measurement | None:
+    return (
+        db.query(Measurement)
+        .filter(Measurement.installation_id == installation_id)
+        .order_by(Measurement.captured_at.desc())
+        .first()
+    )
+
+
+def latest_sensors_for_installation(
+    db: Session, installation_id: str
+) -> list[SharedSensor]:
+    sensors = (
+        db.query(SharedSensor)
+        .filter(SharedSensor.installation_id == installation_id)
+        .all()
+    )
+    return sort_shared_sensors(sensors)
+
+
+def sort_shared_sensors(sensors: list[SharedSensor]) -> list[SharedSensor]:
+    return sorted(
+        sensors, key=lambda sensor: (shared_sensor_display_label(sensor), sensor.key)
+    )
+
+
+def shared_sensor_schema(sensor: SharedSensor) -> SharedSensorSchema:
+    return SharedSensorSchema(
+        key=sensor.key,
+        label=shared_sensor_display_label(sensor),
+        preferred_alias=sensor.preferred_alias,
+        value=sensor.value,
+        unit=sensor.unit,
+        device_class=sensor.device_class,
+        state_class=sensor.state_class,
+        updated_at=sensor.updated_at,
     )
 
 
@@ -320,76 +347,13 @@ def store_shared_sensors(
     now = datetime.now(timezone.utc)
 
     query_started = perf_counter()
-    if db.get_bind().dialect.name in {"postgresql", "sqlite"}:
-        _upsert_shared_sensors(db, installation_id, updates, now)
-        log_timing(
-            "sensor_database_queries",
-            installation_id=installation_id,
-            duration_ms=elapsed_ms(query_started),
-            update_count=len(updates),
-            write_strategy="atomic_upsert",
-        )
-        commit_started = perf_counter()
-        db.commit()
-        log_timing(
-            "sensor_database_commit",
-            installation_id=installation_id,
-            duration_ms=elapsed_ms(commit_started),
-        )
-        refresh_started = perf_counter()
-        installation = db.get(Installation, installation_id)
-        if installation is None:
-            raise RuntimeError("Installation missing after shared sensor upsert")
-        sensors = installation.shared_sensors
-        log_timing(
-            "sensor_database_refresh",
-            installation_id=installation_id,
-            duration_ms=elapsed_ms(refresh_started),
-        )
-        return sensors
-
-    installation = db.get(Installation, installation_id)
-    if installation is None:
-        installation = Installation(id=installation_id, last_seen=now)
-        db.add(installation)
-    else:
-        installation.last_seen = now
-
-    for update in updates:
-        existing = (
-            db.query(SharedSensor)
-            .filter(
-                SharedSensor.installation_id == installation_id,
-                SharedSensor.key == update.key,
-            )
-            .first()
-        )
-
-        if existing:
-            existing.label = update.label
-            existing.value = update.value
-            existing.unit = update.unit
-            existing.device_class = update.device_class
-            existing.state_class = update.state_class
-            existing.updated_at = now
-        else:
-            new_sensor = SharedSensor(
-                installation_id=installation_id,
-                key=update.key,
-                label=update.label,
-                value=update.value,
-                unit=update.unit,
-                device_class=update.device_class,
-                state_class=update.state_class,
-                updated_at=now,
-            )
-            db.add(new_sensor)
-
+    _upsert_shared_sensors(db, installation_id, updates, now)
     log_timing(
         "sensor_database_queries",
         installation_id=installation_id,
         duration_ms=elapsed_ms(query_started),
         update_count=len(updates),
+        write_strategy="atomic_upsert",
     )
     commit_started = perf_counter()
     db.commit()
@@ -399,7 +363,9 @@ def store_shared_sensors(
         duration_ms=elapsed_ms(commit_started),
     )
     refresh_started = perf_counter()
-    db.refresh(installation)
+    installation = db.get(Installation, installation_id)
+    if installation is None:
+        raise RuntimeError("Installation missing after shared sensor upsert")
     sensors = installation.shared_sensors
     log_timing(
         "sensor_database_refresh",

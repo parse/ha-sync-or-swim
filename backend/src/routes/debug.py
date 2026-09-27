@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 
 from auth import verify_token
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from routes.dependencies import valid_installation_id
 from schemas.models import (
     DosingProblemSchema,
     LatestMeasurementSchema,
     PoolAnalysisSchema,
     UnitAnalysis,
-    validate_installation_id,
 )
 
 router = APIRouter()
@@ -15,13 +15,9 @@ router = APIRouter()
 
 @router.get("/{installation_id}", response_model=LatestMeasurementSchema)
 async def get_debug_measurement(
-    installation_id: str, _auth: None = Depends(verify_token)
+    _auth: None = Depends(verify_token),
+    installation_id: str = Depends(valid_installation_id),
 ) -> LatestMeasurementSchema:
-    try:
-        validate_installation_id(installation_id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
     now = datetime.now(timezone.utc)
     return LatestMeasurementSchema(
         installation_id=installation_id,

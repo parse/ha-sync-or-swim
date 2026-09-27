@@ -146,17 +146,16 @@ async def test_sensor_push_allows_response_longer_than_old_ten_second_budget():
 
 
 @pytest.mark.asyncio
-async def test_sensor_push_retries_timeout_then_succeeds(monkeypatch):
+async def test_sensor_push_retries_timeout_then_succeeds():
     api_client = load_api_client()
     FakeSession.responses = [
         FakeResponse(enter_error=TimeoutError()),
         FakeResponse(),
     ]
-    client = api_client.SyncOrSwimApiClient(
-        "https://backend.example", None, FakeSession()
-    )
     sleep = AsyncMock()
-    monkeypatch.setattr(api_client.asyncio, "sleep", sleep)
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession(), sleep=sleep
+    )
 
     await client.push_shared_sensors("pool-1", [{"key": "sensor.pool"}])
 
@@ -169,13 +168,12 @@ async def test_sensor_push_retries_timeout_then_succeeds(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_sensor_push_retries_cold_start_503(monkeypatch):
+async def test_sensor_push_retries_cold_start_503():
     api_client = load_api_client()
     FakeSession.responses = [FakeResponse(status=503), FakeResponse()]
     client = api_client.SyncOrSwimApiClient(
-        "https://backend.example", None, FakeSession()
+        "https://backend.example", None, FakeSession(), sleep=AsyncMock()
     )
-    monkeypatch.setattr(api_client.asyncio, "sleep", AsyncMock())
 
     await client.push_shared_sensors("pool-1", [{"key": "sensor.pool"}])
 
@@ -183,14 +181,13 @@ async def test_sensor_push_retries_cold_start_503(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_sensor_push_does_not_retry_permanent_4xx(monkeypatch):
+async def test_sensor_push_does_not_retry_permanent_4xx():
     api_client = load_api_client()
     FakeSession.responses = [FakeResponse(status=400, text="invalid")]
-    client = api_client.SyncOrSwimApiClient(
-        "https://backend.example", None, FakeSession()
-    )
     sleep = AsyncMock()
-    monkeypatch.setattr(api_client.asyncio, "sleep", sleep)
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example", None, FakeSession(), sleep=sleep
+    )
 
     with pytest.raises(api_client.SyncOrSwimApiError, match="400 invalid"):
         await client.push_shared_sensors("pool-1", [{"key": "sensor.pool"}])
@@ -199,19 +196,12 @@ async def test_sensor_push_does_not_retry_permanent_4xx(monkeypatch):
     sleep.assert_not_awaited()
 
 
-@pytest.mark.asyncio
-async def test_sensor_push_retry_delay_caps_jittered_total(monkeypatch):
+def test_retry_delay_grows_exponentially_and_caps_jittered_total():
     api_client = load_api_client()
-    client = api_client.SyncOrSwimApiClient(
-        "https://backend.example", None, FakeSession()
-    )
-    sleep = AsyncMock()
-    monkeypatch.setattr(api_client.asyncio, "sleep", sleep)
-    monkeypatch.setattr(api_client.random, "uniform", lambda start, end: 0.5)
 
-    await client._retry_delay(10)
-
-    sleep.assert_awaited_once_with(8.0)
+    assert api_client.retry_delay_seconds(1, 0.25) == 1.25
+    assert api_client.retry_delay_seconds(3, 0.5) == 4.5
+    assert api_client.retry_delay_seconds(10, 0.5) == 8.0
 
 
 @pytest.mark.asyncio

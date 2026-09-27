@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+
+import pytest
 from db.migrations import migrate_schema
 from db.models import Base, Installation, Measurement, SharedSensor
 from db.session import engine
@@ -100,3 +103,10 @@ def test_schema_migration_creates_all_tables_on_empty_database():
         Measurement.__tablename__,
         SharedSensor.__tablename__,
     }
+
+
+def test_schema_migration_rejects_unsupported_dialect():
+    mysql_engine = SimpleNamespace(dialect=SimpleNamespace(name="mysql"))
+
+    with pytest.raises(RuntimeError, match="Unsupported database dialect 'mysql'"):
+        migrate_schema(mysql_engine)

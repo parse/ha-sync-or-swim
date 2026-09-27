@@ -13,11 +13,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @router.post("/{installation_id}/burst", response_model=LatestMeasurementSchema)
-async def analyze_and_store_image_burst(
+def analyze_and_store_image_burst(
     installation_id: str,
     files: list[UploadFile] = File(...),
-    db: Session = Depends(get_db),
     _auth: None = Depends(verify_token),
+    db: Session = Depends(get_db),
 ) -> LatestMeasurementSchema:
     try:
         validate_installation_id(installation_id)
@@ -28,11 +28,7 @@ async def analyze_and_store_image_burst(
         raise HTTPException(status_code=400, detail="No files provided")
 
     try:
-        images_bytes: list[bytes] = []
-        for file in files:
-            content = await file.read()
-            images_bytes.append(content)
-
+        images_bytes = [file.file.read() for file in files]
         result = analyze_burst(images_bytes)
         return store_cv_result(db, installation_id, result)
     except ValueError as e:
@@ -40,4 +36,4 @@ async def analyze_and_store_image_burst(
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         _LOGGER.exception("Error analyzing burst for %s", installation_id)
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="Analysis failed") from e

@@ -4,18 +4,17 @@ from db.session import get_db
 from fastapi import APIRouter, Depends, HTTPException
 from measurement_service import latest_schema_from_measurement
 from schemas.models import LatestMeasurementSchema, validate_installation_id
-from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 router = APIRouter()
 
 
 @router.get("/{installation_id}", response_model=LatestMeasurementSchema)
-async def get_latest_measurement(
+def get_latest_measurement(
     installation_id: str,
     staleness_threshold_minutes: int | None = None,
-    db: Session = Depends(get_db),
     _auth: None = Depends(verify_token),
+    db: Session = Depends(get_db),
 ) -> LatestMeasurementSchema:
     try:
         validate_installation_id(installation_id)
@@ -30,7 +29,7 @@ async def get_latest_measurement(
     latest = (
         db.query(Measurement)
         .filter(Measurement.installation_id == installation_id)
-        .order_by(desc(Measurement.captured_at))
+        .order_by(Measurement.captured_at.desc())
         .first()
     )
 

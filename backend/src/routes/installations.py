@@ -20,7 +20,6 @@ from schemas.models import (
     SharedSensorUpdateSchema,
     validate_installation_id,
 )
-from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -118,11 +117,11 @@ def render_error_fragment(message: str) -> str:
 
 
 @router.get("/", response_model=list[InstallationResponseSchema])
-async def get_installations(
-    db: Session = Depends(get_db), _auth: None = Depends(verify_token)
+def get_installations(
+    _auth: None = Depends(verify_token), db: Session = Depends(get_db)
 ) -> list[InstallationResponseSchema]:
     all_installations = (
-        db.query(Installation).order_by(desc(Installation.last_seen)).all()
+        db.query(Installation).order_by(Installation.last_seen.desc()).all()
     )
 
     return [
@@ -136,10 +135,10 @@ async def get_installations(
 @router.get(
     "/{installation_id}/sensors/latest", response_model=list[SharedSensorSchema]
 )
-async def get_latest_sensors(
+def get_latest_sensors(
     installation_id: str,
-    db: Session = Depends(get_db),
     _auth: None = Depends(verify_web_ui_token),
+    db: Session = Depends(get_db),
 ) -> list[SharedSensorSchema]:
     try:
         validate_installation_id(installation_id)
@@ -155,10 +154,10 @@ async def get_latest_sensors(
 
 
 @router.post("/{installation_id}/disabled", response_model=LatestMeasurementSchema)
-async def disable_installation(
+def disable_installation(
     installation_id: str,
-    db: Session = Depends(get_db),
     _auth: None = Depends(verify_token),
+    db: Session = Depends(get_db),
 ) -> LatestMeasurementSchema:
     try:
         validate_installation_id(installation_id)
@@ -172,8 +171,8 @@ async def disable_installation(
 def update_sensors(
     installation_id: str,
     updates: list[SharedSensorUpdateSchema],
-    db: Session = Depends(get_db),
     _auth: None = Depends(verify_token),
+    db: Session = Depends(get_db),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
 ) -> list[SharedSensorSchema]:
     validation_started = perf_counter()

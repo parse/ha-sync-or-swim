@@ -166,3 +166,67 @@ def test_analyze_burst_endpoint_rejects_undecodable_image():
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Could not decode image bytes"
+
+
+def test_analyze_burst_endpoint_rejects_wrong_token_of_same_length(
+    multipart_files_builder,
+):
+    response = client.post(
+        "/api/analyze/test-installation/burst",
+        headers={"Authorization": "Bearer test-tokex"},
+        files=multipart_files_builder("burst_9_light_off_bw"),
+    )
+
+    assert response.status_code == 401
+
+
+def test_analyze_burst_endpoint_rejects_installation_id_with_trailing_newline(
+    multipart_files_builder,
+):
+    response = client.post(
+        "/api/analyze/test-installation%0A/burst",
+        headers={"Authorization": "Bearer test-token"},
+        files=multipart_files_builder("burst_9_light_off_bw"),
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid installation ID"
+
+
+def test_analyze_burst_endpoint_rejects_image_smaller_than_crop():
+    import cv2
+    import numpy as np
+
+    ok, encoded = cv2.imencode(".jpg", np.zeros((1080, 1920, 3), dtype=np.uint8))
+    assert ok
+
+    response = client.post(
+        "/api/analyze/test-installation/burst",
+        headers={"Authorization": "Bearer test-token"},
+        files=[("files", ("frame.jpg", encoded.tobytes(), "image/jpeg"))],
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == (
+        "Image is 1920x1080, expected at least 4800x1300"
+    )
+
+
+def test_analyze_burst_endpoint_hides_unexpected_error_details(
+    monkeypatch, multipart_files_builder
+):
+    from routes import analyze
+
+    def fail(images_bytes: list[bytes]) -> None:
+        raise RuntimeError("secret internal detail")
+
+    monkeypatch.setattr(analyze, "analyze_burst", fail)
+
+    response = client.post(
+        "/api/analyze/test-installation/burst",
+        headers={"Authorization": "Bearer test-token"},
+        files=multipart_files_builder("burst_9_light_off_bw"),
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Analysis failed"

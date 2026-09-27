@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 
-from db.migrations import migrate_shared_sensors_table
+from db.migrations import migrate_schema
 from db.session import engine
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +16,7 @@ from routes import analyze, debug, installations, latest, ui
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     started = perf_counter()
-    migrate_shared_sensors_table(engine)
+    migrate_schema(engine)
     log_timing("database_migration", duration_ms=elapsed_ms(started))
     yield
 
@@ -66,7 +66,7 @@ async def log_sensor_request_timing(request: Request, call_next):  # type: ignor
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

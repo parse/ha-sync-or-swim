@@ -80,7 +80,7 @@ def test_legacy_latest_endpoint_alias_still_works(
     assert response.status_code == 200
 
     latest_response = client.get(
-        "/latest/test-installation",
+        "/api/latest/test-installation",
         headers={"Authorization": "Bearer test-token"},
     )
 

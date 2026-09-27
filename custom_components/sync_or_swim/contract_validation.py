@@ -125,6 +125,9 @@ def validate_shared_sensor(data: Any, field_name: str) -> SharedSensor:
     _require_type(data, dict, field_name)
     _require_type(data.get("key"), str, f"{field_name}.key")
     _require_type(data.get("label"), str, f"{field_name}.label")
+    _require_nullable_string(
+        data.get("preferred_alias"), f"{field_name}.preferred_alias"
+    )
     _require_type(data.get("value"), str, f"{field_name}.value")
     _require_nullable_string(data.get("unit"), f"{field_name}.unit")
     _require_nullable_string(data.get("device_class"), f"{field_name}.device_class")
@@ -134,6 +137,7 @@ def validate_shared_sensor(data: Any, field_name: str) -> SharedSensor:
     return {
         "key": cast(str, data["key"]),
         "label": cast(str, data["label"]),
+        "preferred_alias": cast(str | None, data.get("preferred_alias")),
         "value": cast(str, data["value"]),
         "unit": cast(str | None, data.get("unit")),
         "device_class": cast(str | None, data.get("device_class")),

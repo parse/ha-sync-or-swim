@@ -295,6 +295,33 @@ async def test_get_latest_defaults_missing_dosing_problem_reason_to_none():
 
 
 @pytest.mark.asyncio
+async def test_get_latest_keeps_shared_sensor_preferred_alias():
+    api_client = load_api_client()
+    payload = sample_measurement()
+    sensor = {
+        "key": "sensor.cellar_temperature",
+        "label": "Pool temperature",
+        "value": "12.3",
+        "updated_at": "2026-04-28T18:16:37Z",
+    }
+    payload["sensors"] = [
+        {**sensor, "preferred_alias": "Pool temperature"},
+        {**sensor, "key": "sensor.without_alias"},
+    ]
+    FakeSession.responses = [FakeResponse(payload=payload)]
+    client = api_client.SyncOrSwimApiClient(
+        "https://backend.example/", "secret", FakeSession()
+    )
+
+    data = await client.get_latest("pool-1")
+
+    assert [s["preferred_alias"] for s in data["sensors"]] == [
+        "Pool temperature",
+        None,
+    ]
+
+
+@pytest.mark.asyncio
 async def test_get_latest_defaults_missing_dosing_problem_message_to_none():
     api_client = load_api_client()
     payload = sample_measurement()

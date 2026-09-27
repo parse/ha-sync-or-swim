@@ -37,6 +37,9 @@ from .const import (
 )
 
 INSTALLATION_ID_REGEX = re.compile(INSTALLATION_ID_PATTERN)
+MINUTES = vol.All(vol.Coerce(int), vol.Range(min=1))
+NON_NEGATIVE_MINUTES = vol.All(vol.Coerce(int), vol.Range(min=0))
+SECONDS = vol.All(vol.Coerce(int), vol.Range(min=1))
 
 
 class SyncOrSwimMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -118,10 +121,10 @@ class SyncOrSwimMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_BACKEND_URL): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
-                    ): int,
+                    ): MINUTES,
                     vol.Optional(
                         CONF_STALENESS_THRESHOLD, default=DEFAULT_STALENESS_THRESHOLD
-                    ): int,
+                    ): NON_NEGATIVE_MINUTES,
                 }
             ),
             errors=errors,
@@ -173,10 +176,10 @@ class SyncOrSwimMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_BACKEND_URL): str,
                     vol.Optional(
                         CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL
-                    ): int,
+                    ): MINUTES,
                     vol.Optional(
                         CONF_STALENESS_THRESHOLD, default=DEFAULT_STALENESS_THRESHOLD
-                    ): int,
+                    ): NON_NEGATIVE_MINUTES,
                 }
             ),
             errors=errors,
@@ -248,6 +251,12 @@ class SyncOrSwimOptionsFlowHandler(config_entries.OptionsFlowWithReload):
 
         if user_input is not None:
             if self._config_entry.data[CONF_ROLE] == ROLE_PRODUCER:
+                # Home Assistant omits cleared optional fields from the submission.
+                user_input = {
+                    CONF_SHARED_SENSORS: [],
+                    CONF_SHARED_SENSOR_INTERVALS: "",
+                    **user_input,
+                }
                 try:
                     parse_shared_sensor_intervals(
                         user_input.get(CONF_SHARED_SENSOR_INTERVALS, "")
@@ -262,7 +271,10 @@ class SyncOrSwimOptionsFlowHandler(config_entries.OptionsFlowWithReload):
 
         return self.async_show_form(
             step_id="init",
-            data_schema=_options_schema(self._config_entry),
+            data_schema=self.add_suggested_values_to_schema(
+                _options_schema(self._config_entry),
+                _current_options(self._config_entry),
+            ),
             errors=errors,
         )
 
@@ -300,71 +312,66 @@ def _reconfigure_schema(entry: config_entries.ConfigEntry) -> vol.Schema:
 
 
 def _options_schema(entry: config_entries.ConfigEntry) -> vol.Schema:
-    role = entry.data[CONF_ROLE]
+    """Build the options schema; current values are applied as suggestions."""
     fields: dict[Any, Any] = {
         vol.Optional(
-            CONF_STALENESS_THRESHOLD,
-            default=effective_entry_value(
-                entry, CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD
-            ),
-        ): int,
+            CONF_STALENESS_THRESHOLD, default=DEFAULT_STALENESS_THRESHOLD
+        ): NON_NEGATIVE_MINUTES,
     }
 
-    if role == ROLE_PRODUCER:
+    if entry.data[CONF_ROLE] == ROLE_PRODUCER:
         fields.update(
             {
                 vol.Optional(
-                    CONF_SCAN_INTERVAL,
-                    default=effective_entry_value(
-                        entry, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-                    ),
-                ): int,
+                    CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
+                ): MINUTES,
                 vol.Optional(
-                    CONF_INSTALLATION_ENABLED,
-                    default=effective_entry_value(
-                        entry,
-                        CONF_INSTALLATION_ENABLED,
-                        DEFAULT_INSTALLATION_ENABLED,
-                    ),
+                    CONF_INSTALLATION_ENABLED, default=DEFAULT_INSTALLATION_ENABLED
                 ): bool,
-                vol.Optional(
-                    CONF_SHARED_SENSORS,
-                    default=effective_entry_value(entry, CONF_SHARED_SENSORS, []),
-                ): selector.EntitySelector(
+                vol.Optional(CONF_SHARED_SENSORS): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="sensor", multiple=True)
                 ),
-                vol.Optional(
-                    CONF_SHARED_SENSOR_INTERVALS,
-                    default=effective_entry_value(
-                        entry, CONF_SHARED_SENSOR_INTERVALS, ""
-                    ),
-                ): selector.TextSelector(selector.TextSelectorConfig(multiline=True)),
+                vol.Optional(CONF_SHARED_SENSOR_INTERVALS): selector.TextSelector(
+                    selector.TextSelectorConfig(multiline=True)
+                ),
                 vol.Optional(
                     CONF_SENSOR_PUSH_CONNECT_TIMEOUT,
-                    default=effective_entry_value(
-                        entry,
-                        CONF_SENSOR_PUSH_CONNECT_TIMEOUT,
-                        DEFAULT_SENSOR_PUSH_CONNECT_TIMEOUT,
-                    ),
-                ): int,
+                    default=DEFAULT_SENSOR_PUSH_CONNECT_TIMEOUT,
+                ): SECONDS,
                 vol.Optional(
                     CONF_SENSOR_PUSH_TOTAL_TIMEOUT,
-                    default=effective_entry_value(
-                        entry,
-                        CONF_SENSOR_PUSH_TOTAL_TIMEOUT,
-                        DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
-                    ),
-                ): int,
+                    default=DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
+                ): SECONDS,
             }
         )
     else:
-        fields[
-            vol.Optional(
-                CONF_POLL_INTERVAL,
-                default=effective_entry_value(
-                    entry, CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
-                ),
-            )
-        ] = int
+        fields[vol.Optional(CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL)] = (
+            MINUTES
+        )
 
     return vol.Schema(fields)
+
+
+def _current_options(entry: config_entries.ConfigEntry) -> dict[str, Any]:
+    """Return the values the options form should show for an entry."""
+    current: dict[str, Any] = {
+        CONF_STALENESS_THRESHOLD: effective_entry_value(
+            entry, CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD
+        ),
+    }
+    if entry.data[CONF_ROLE] != ROLE_PRODUCER:
+        current[CONF_POLL_INTERVAL] = effective_entry_value(
+            entry, CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
+        )
+        return current
+
+    for key, default in (
+        (CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+        (CONF_INSTALLATION_ENABLED, DEFAULT_INSTALLATION_ENABLED),
+        (CONF_SHARED_SENSORS, []),
+        (CONF_SHARED_SENSOR_INTERVALS, ""),
+        (CONF_SENSOR_PUSH_CONNECT_TIMEOUT, DEFAULT_SENSOR_PUSH_CONNECT_TIMEOUT),
+        (CONF_SENSOR_PUSH_TOTAL_TIMEOUT, DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT),
+    ):
+        current[key] = effective_entry_value(entry, key, default)
+    return current

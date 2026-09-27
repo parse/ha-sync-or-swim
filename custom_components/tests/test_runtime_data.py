@@ -89,6 +89,9 @@ def stub_modules():
         def async_show_form(self, **kwargs):
             return {"type": "form", **kwargs}
 
+        def add_suggested_values_to_schema(self, schema, suggested_values):
+            return {"schema": schema, "suggested_values": suggested_values}
+
         def async_create_entry(self, **kwargs):
             return {"type": "create_entry", **kwargs}
 
@@ -189,6 +192,9 @@ def stub_modules():
         repr(default),
     )
     modules["voluptuous"].In = lambda value: ("in", tuple(value))
+    modules["voluptuous"].All = lambda *validators: ("all", validators)
+    modules["voluptuous"].Coerce = lambda value: ("coerce", value)
+    modules["voluptuous"].Range = lambda **kwargs: ("range", kwargs)
 
     sys.modules.update(modules)
 
@@ -527,6 +533,65 @@ async def test_options_flow_rejects_invalid_shared_sensor_intervals():
     assert result["errors"] == {
         "shared_sensor_intervals": "invalid_shared_sensor_intervals"
     }
+
+
+@pytest.mark.asyncio
+async def test_options_flow_producer_can_clear_shared_sensors():
+    config_flow = load_module("config_flow")
+    entry = SimpleNamespace(
+        data={"role": "producer"},
+        options={
+            "shared_sensors": ["sensor.pool"],
+            "shared_sensor_intervals": "sensor.pool=5",
+        },
+    )
+    options_flow = config_flow.SyncOrSwimOptionsFlowHandler(entry)
+
+    # Home Assistant leaves cleared optional fields out of the submission.
+    result = await options_flow.async_step_init(
+        {"scan_interval": 30, "staleness_threshold": 120, "installation_enabled": True}
+    )
+
+    assert result["type"] == "create_entry"
+    assert result["data"]["shared_sensors"] == []
+    assert result["data"]["shared_sensor_intervals"] == ""
+
+
+@pytest.mark.asyncio
+async def test_options_flow_suggests_current_values_instead_of_defaults():
+    config_flow = load_module("config_flow")
+    entry = SimpleNamespace(
+        data={"role": "producer"},
+        options={"scan_interval": 30, "shared_sensors": ["sensor.pool"]},
+    )
+    options_flow = config_flow.SyncOrSwimOptionsFlowHandler(entry)
+
+    result = await options_flow.async_step_init()
+
+    data_schema = result["data_schema"]
+    assert data_schema["suggested_values"]["scan_interval"] == 30
+    assert data_schema["suggested_values"]["shared_sensors"] == ["sensor.pool"]
+    assert ("optional", "shared_sensors", "None") in data_schema["schema"]
+    assert ("optional", "shared_sensor_intervals", "None") in data_schema["schema"]
+
+
+def test_numeric_options_are_bounded():
+    config_flow = load_module("config_flow")
+    schema = config_flow._options_schema(SimpleNamespace(data={"role": "producer"}))
+
+    assert schema[("optional", "scan_interval", "60")] == config_flow.MINUTES
+    assert (
+        schema[("optional", "staleness_threshold", "120")]
+        == config_flow.NON_NEGATIVE_MINUTES
+    )
+    assert (
+        schema[("optional", "sensor_push_total_timeout", "30")] == config_flow.SECONDS
+    )
+    assert config_flow.MINUTES == ("all", (("coerce", int), ("range", {"min": 1})))
+    assert config_flow.NON_NEGATIVE_MINUTES == (
+        "all",
+        (("coerce", int), ("range", {"min": 0})),
+    )
 
 
 @pytest.mark.asyncio

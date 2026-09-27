@@ -257,6 +257,8 @@ def test_unit_column_suffixes_cover_every_unit_field_and_column():
     from schemas.models import UnitAnalysis
 
     assert set(UNIT_COLUMN_SUFFIXES) == set(UnitAnalysis.model_fields)
+    suffixes = list(UNIT_COLUMN_SUFFIXES.values())
+    assert len(set(suffixes)) == len(suffixes), "each field needs its own column"
     for unit_name in ("chlorine", "ph"):
         for suffix in UNIT_COLUMN_SUFFIXES.values():
             assert hasattr(Measurement, f"{unit_name}_{suffix}")

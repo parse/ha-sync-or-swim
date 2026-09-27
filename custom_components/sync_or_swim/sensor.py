@@ -24,16 +24,6 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 UnitName = Literal["chlorine", "ph"]
 INVALID_SHARED_SENSOR_VALUES = {"unknown", "unavailable"}
-GENERIC_SHARED_SENSOR_LABELS = {
-    "battery",
-    "current",
-    "energy",
-    "humidity",
-    "illuminance",
-    "power",
-    "temperature",
-    "voltage",
-}
 
 
 async def async_setup_entry(
@@ -103,7 +93,8 @@ class SyncOrSwimSharedSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._coordinator = coordinator
         self._key = sensor_data["key"]
-        display_label = shared_sensor_display_label(self._key, sensor_data["label"])
+        # The backend resolves the display label (alias, friendly name or key).
+        display_label = sensor_data["label"]
         self._attr_name = f"SyncOrSwim Shared {display_label}"
         self._attr_suggested_object_id = (
             f"syncorswim_shared_{slugify_shared_sensor_name(display_label)}"
@@ -331,17 +322,6 @@ def format_leds(solid_leds: list[str] | None, blinking_leds: list[str] | None) -
     if blinking_leds:
         parts.append(f"Blinking: {', '.join(blinking_leds)}")
     return "; ".join(parts) if parts else "none"
-
-
-def shared_sensor_display_label(key: str, label: str) -> str:
-    if label.strip().lower() not in GENERIC_SHARED_SENSOR_LABELS:
-        return label
-
-    object_id = key.split(".", 1)[-1]
-    parts = [p for p in object_id.split("_") if p and p not in {"sensor", "temp"}]
-    if parts:
-        return " ".join(p.capitalize() for p in parts)
-    return label
 
 
 def slugify_shared_sensor_name(value: str) -> str:

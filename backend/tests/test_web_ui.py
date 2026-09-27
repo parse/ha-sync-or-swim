@@ -483,6 +483,59 @@ def test_latest_sensors_use_preferred_alias_when_set_manually():
     assert "Cellar temperature" not in fragment.text
 
 
+def test_latest_sensors_derive_label_from_key_when_friendly_name_is_generic():
+    response = client.post(
+        "/api/installations/test-installation/sensors",
+        headers={"Authorization": "Bearer test-token"},
+        json=[
+            {
+                "key": "sensor.temp_sensor_cellar_temperature",
+                "label": "Temperature",
+                "value": "12.3",
+            },
+            {"key": "sensor.pool_power", "label": "Pool pump", "value": "80"},
+        ],
+    )
+    assert response.status_code == 200
+
+    latest = client.get(
+        "/api/installations/test-installation/sensors/latest",
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+    assert latest.status_code == 200
+    assert [sensor["label"] for sensor in latest.json()] == [
+        "Cellar Temperature",
+        "Pool pump",
+    ]
+
+
+def test_latest_sensors_keep_generic_preferred_alias():
+    response = client.post(
+        "/api/installations/test-installation/sensors",
+        headers={"Authorization": "Bearer test-token"},
+        json=[
+            {
+                "key": "sensor.temp_sensor_cellar_temperature",
+                "label": "Temperature",
+                "value": "12.3",
+            }
+        ],
+    )
+    assert response.status_code == 200
+
+    with SessionLocal() as db:
+        sensor = db.query(SharedSensor).one()
+        sensor.preferred_alias = "Temperature"
+        db.commit()
+
+    latest = client.get(
+        "/api/installations/test-installation/sensors/latest",
+        headers={"Authorization": "Bearer web-test-token"},
+    )
+    assert latest.status_code == 200
+    assert latest.json()[0]["label"] == "Temperature"
+
+
 def test_latest_sensors_fragment_escapes_sensor_values():
     client.post(
         "/api/installations/test-installation/sensors",

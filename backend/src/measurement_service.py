@@ -21,6 +21,18 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
+# Home Assistant friendly names that say what is measured but not where.
+GENERIC_SHARED_SENSOR_LABELS = {
+    "battery",
+    "current",
+    "energy",
+    "humidity",
+    "illuminance",
+    "power",
+    "temperature",
+    "voltage",
+}
+
 
 def led_labels(leds: list[int]) -> list[str]:
     return [f"LED {led}" for led in leds]
@@ -239,8 +251,18 @@ def latest_schema_from_measurement(
 
 def shared_sensor_display_label(sensor: SharedSensor) -> str:
     preferred_alias = sensor.preferred_alias.strip() if sensor.preferred_alias else ""
+    if preferred_alias:
+        return preferred_alias
+
     label = sensor.label.strip() if sensor.label else ""
-    return preferred_alias or label or sensor.key
+    if not label:
+        return sensor.key
+    if label.lower() not in GENERIC_SHARED_SENSOR_LABELS:
+        return label
+
+    object_id = sensor.key.split(".", 1)[-1]
+    parts = [p for p in object_id.split("_") if p and p not in {"sensor", "temp"}]
+    return " ".join(p.capitalize() for p in parts) if parts else label
 
 
 def store_cv_result(

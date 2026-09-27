@@ -16,7 +16,7 @@ CONF_PUSH_TOKEN = "push_token"
 CONF_SCAN_INTERVAL = "scan_interval"  # minutes
 CONF_POLL_INTERVAL = "poll_interval"  # minutes
 CONF_STALENESS_THRESHOLD = "staleness_threshold"  # minutes
-CONF_INSTALLATION_ENABLED = "installation_enabled"
+CONF_INSTALLATION_ENABLED: Final = "installation_enabled"
 CONF_SHARED_SENSORS = "shared_sensors"
 CONF_SHARED_SENSOR_INTERVALS = "shared_sensor_intervals"
 CONF_SENSOR_PUSH_CONNECT_TIMEOUT = "sensor_push_connect_timeout"
@@ -33,6 +33,9 @@ DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT = 30
 LIGHT_WARMUP_SECONDS = 1.5
 BURST_COUNT = 8
 BURST_INTERVAL_SECONDS = 0.4
+
+# Home Assistant states that carry no reading
+INVALID_SHARED_SENSOR_STATES = {"unknown", "unavailable"}
 
 # Status values
 STATUS_OK: Final[Literal["ok"]] = "ok"

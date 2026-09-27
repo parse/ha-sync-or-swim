@@ -37,14 +37,16 @@ from .const import (
     DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
+    INVALID_SHARED_SENSOR_STATES,
     LIGHT_WARMUP_SECONDS,
+    ROLE_CONSUMER,
+    ROLE_PRODUCER,
     STATUS_UNKNOWN,
 )
 from .contract_validation import SyncOrSwimData
 from .entry_types import SyncOrSwimConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
-INVALID_SHARED_SENSOR_STATES = {"unknown", "unavailable"}
 
 
 def compute_stale(captured_at_iso: str | None, threshold_minutes: int) -> bool:
@@ -119,31 +121,72 @@ def shared_sensor_update_from_state(
     }
 
 
-class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
-    """Data coordinator for the producer role."""
+class _BackendCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
+    """Shared setup and latest-data fetching for both roles."""
 
-    def __init__(self, hass: HomeAssistant, entry: SyncOrSwimConfigEntry):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: SyncOrSwimConfigEntry,
+        *,
+        role: str,
+        interval_minutes: int,
+        sensor_push_connect_timeout: float = DEFAULT_SENSOR_PUSH_CONNECT_TIMEOUT,
+        sensor_push_total_timeout: float = DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
+    ) -> None:
         entry_data = entry.data
-        interval_minutes = effective_entry_value(
-            entry, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-        )
         super().__init__(
             hass,
             logger=_LOGGER,
-            name=f"{DOMAIN}_producer_{entry_data['installation_id']}",
+            name=f"{DOMAIN}_{role}_{entry_data['installation_id']}",
             update_interval=timedelta(minutes=interval_minutes),
         )
         self._entry = entry
-        self._entry_data = entry_data
         self._installation_id = entry_data["installation_id"]
         self._staleness_minutes = effective_entry_value(
             entry, CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD
         )
-        self._shared_sensor_locks: dict[str, asyncio.Lock] = {}
         self._api_client = SyncOrSwimApiClient(
             effective_entry_value(entry, CONF_BACKEND_URL, entry_data["backend_url"]),
             effective_entry_value(entry, CONF_PUSH_TOKEN, entry_data.get("push_token")),
             async_get_clientsession(hass),
+            sensor_push_connect_timeout=sensor_push_connect_timeout,
+            sensor_push_total_timeout=sensor_push_total_timeout,
+        )
+
+    async def _async_fetch_latest_data(self) -> SyncOrSwimData:
+        try:
+            _LOGGER.debug("Fetching latest backend data")
+            remote_data = await self._api_client.get_latest(
+                self._installation_id, self._staleness_minutes
+            )
+        except SyncOrSwimApiNotFound:
+            _LOGGER.info("No data found for installation %s", self._installation_id)
+            return unknown_data()
+        except Exception as exc:
+            _LOGGER.exception("Error fetching latest backend data")
+            raise UpdateFailed(f"Failed to fetch latest data: {exc}") from exc
+
+        return {
+            **remote_data,
+            "stale": compute_stale(
+                remote_data.get("captured_at"), self._staleness_minutes
+            ),
+            "error": None,
+        }
+
+
+class ProducerCoordinator(_BackendCoordinator):
+    """Data coordinator for the producer role."""
+
+    def __init__(self, hass: HomeAssistant, entry: SyncOrSwimConfigEntry):
+        super().__init__(
+            hass,
+            entry,
+            role=ROLE_PRODUCER,
+            interval_minutes=effective_entry_value(
+                entry, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+            ),
             sensor_push_connect_timeout=effective_entry_value(
                 entry,
                 CONF_SENSOR_PUSH_CONNECT_TIMEOUT,
@@ -155,12 +198,13 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
                 DEFAULT_SENSOR_PUSH_TOTAL_TIMEOUT,
             ),
         )
+        self._shared_sensor_locks: dict[str, asyncio.Lock] = {}
         self._setup_shared_sensor_timers()
 
     @property
     def installation_enabled(self) -> bool:
         return self._entry.options.get(
-            "installation_enabled", DEFAULT_INSTALLATION_ENABLED
+            CONF_INSTALLATION_ENABLED, DEFAULT_INSTALLATION_ENABLED
         )
 
     def _existing_data_with_error(self, exc: Exception) -> SyncOrSwimData | None:
@@ -214,10 +258,6 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
                     await asyncio.sleep(BURST_INTERVAL_SECONDS)
 
             _LOGGER.debug("Captured %d images.", len(images))
-            if (
-                not images or not images[0]
-            ):  # Check if capture returned an empty list or empty bytes
-                raise UpdateFailed("No image data captured from camera.")
 
             # 2. Call the FastAPI backend endpoint for analysis.
             remote_data = await self._api_client.analyze_burst(
@@ -298,27 +338,6 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
         remote_data = await self._async_fetch_latest_data()
         self.async_set_updated_data(remote_data)
 
-    async def _async_fetch_latest_data(self) -> SyncOrSwimData:
-        try:
-            _LOGGER.debug("Fetching latest backend data for producer")
-            remote_data = await self._api_client.get_latest(
-                self._installation_id, self._staleness_minutes
-            )
-            return {
-                **remote_data,
-                "stale": compute_stale(
-                    remote_data.get("captured_at"), self._staleness_minutes
-                ),
-                "error": None,
-            }
-        except SyncOrSwimApiNotFound:
-            return unknown_data()
-        except Exception as exc:
-            _LOGGER.exception("Error fetching latest backend data")
-            if isinstance(exc, UpdateFailed):
-                raise
-            raise UpdateFailed(f"Failed to fetch latest data: {exc}") from exc
-
     async def async_set_installation_enabled(self, enabled: bool) -> None:
         """Persist installation enabled state and publish matching coordinator data."""
         new_options = dict(self._entry.options)
@@ -344,59 +363,24 @@ class ProducerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
             }
         except Exception as exc:
             _LOGGER.exception("Error storing disabled state")
-            if isinstance(exc, UpdateFailed):
-                raise
             raise UpdateFailed(f"Failed to store disabled state: {exc}") from exc
 
 
-class ConsumerCoordinator(DataUpdateCoordinator[SyncOrSwimData]):
+class ConsumerCoordinator(_BackendCoordinator):
     """Data coordinator for the consumer role."""
 
     def __init__(self, hass: HomeAssistant, entry: SyncOrSwimConfigEntry):
-        entry_data = entry.data
-        interval_minutes = effective_entry_value(
-            entry, CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
-        )
         super().__init__(
             hass,
-            logger=_LOGGER,
-            name=f"{DOMAIN}_consumer_{entry_data['installation_id']}",
-            update_interval=timedelta(minutes=interval_minutes),
-        )
-        self._entry = entry
-        self._entry_data = entry_data
-        self._installation_id = entry_data["installation_id"]
-        self._staleness_minutes = effective_entry_value(
-            entry, CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD
-        )
-        self._api_client = SyncOrSwimApiClient(
-            effective_entry_value(entry, CONF_BACKEND_URL, entry_data["backend_url"]),
-            effective_entry_value(entry, CONF_PUSH_TOKEN, entry_data.get("push_token")),
-            async_get_clientsession(hass),
+            entry,
+            role=ROLE_CONSUMER,
+            interval_minutes=effective_entry_value(
+                entry, CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
+            ),
         )
 
     async def _async_update_data(self) -> SyncOrSwimData:
-        try:
-            _LOGGER.debug("Polling backend for latest data")
-            remote_data = await self._api_client.get_latest(
-                self._installation_id, self._staleness_minutes
-            )
-            data: SyncOrSwimData = {
-                **remote_data,
-                "stale": compute_stale(
-                    remote_data.get("captured_at"), self._staleness_minutes
-                ),
-                "error": None,
-            }
-            return data
-        except SyncOrSwimApiNotFound:
-            _LOGGER.info("No data found for installation %s", self._installation_id)
-            return unknown_data()
-        except Exception as exc:
-            _LOGGER.exception("Error polling backend")
-            if isinstance(exc, UpdateFailed):
-                raise
-            raise UpdateFailed(f"Failed to fetch data: {exc}") from exc
+        return await self._async_fetch_latest_data()
 
 
 SyncOrSwimCoordinator = ProducerCoordinator | ConsumerCoordinator

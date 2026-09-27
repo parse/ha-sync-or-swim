@@ -1,4 +1,4 @@
-from typing import Any, Literal, TypeAlias, cast
+from typing import Any, Literal, TypeAlias, cast, get_args
 
 from .generated_api_types import (
     DosingProblemSchema as _DosingProblemSchema,
@@ -37,18 +37,9 @@ LatestMeasurement: TypeAlias = _LatestMeasurementSchema
 PoolAnalysis: TypeAlias = _PoolAnalysisSchema
 SharedSensor: TypeAlias = _SharedSensorSchema
 UnitAnalysis: TypeAlias = _UnitAnalysis
-VALID_STATUSES = {"ok", "warning", "error", "unknown"}
-VALID_DOSING_PROBLEM_STATES = {"OK", "Warning", "Error"}
-VALID_DOSING_PROBLEM_REASONS = {
-    "stale_data",
-    "chlorine_error",
-    "ph_error",
-    "chlorine_warning",
-    "ph_warning",
-    "multiple_units",
-    "unknown",
-    "none",
-}
+VALID_STATUSES = set(get_args(Status))
+VALID_DOSING_PROBLEM_STATES = set(get_args(DosingProblemState))
+VALID_DOSING_PROBLEM_REASONS = set(get_args(DosingProblemReason))
 
 
 class SyncOrSwimData(_LatestMeasurementSchema):

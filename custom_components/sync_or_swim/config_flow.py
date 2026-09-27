@@ -65,20 +65,10 @@ class SyncOrSwimMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_producer(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
-        errors = {}
+        errors: dict[str, str] = {}
         if user_input is not None:
             installation_id = user_input[CONF_INSTALLATION_ID]
-            if not INSTALLATION_ID_REGEX.fullmatch(installation_id):
-                errors[CONF_INSTALLATION_ID] = "invalid_installation_id"
-
-            await self.async_set_unique_id(installation_id)
-            self._abort_if_unique_id_configured()
-
-            # Validate backend URL
-            if not errors and not await self._test_backend_url(
-                user_input[CONF_BACKEND_URL]
-            ):
-                errors["base"] = "cannot_connect"
+            errors = await self._validate_new_installation(user_input)
 
             # Validate entities
             if not self.hass.states.get(user_input[CONF_CAMERA_ENTITY]):
@@ -133,20 +123,10 @@ class SyncOrSwimMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_consumer(
         self, user_input: dict[str, Any] | None = None
     ) -> Any:
-        errors = {}
+        errors: dict[str, str] = {}
         if user_input is not None:
             installation_id = user_input[CONF_INSTALLATION_ID]
-            if not INSTALLATION_ID_REGEX.fullmatch(installation_id):
-                errors[CONF_INSTALLATION_ID] = "invalid_installation_id"
-
-            await self.async_set_unique_id(installation_id)
-            self._abort_if_unique_id_configured()
-
-            # Validate backend URL
-            if not errors and not await self._test_backend_url(
-                user_input[CONF_BACKEND_URL]
-            ):
-                errors["base"] = "cannot_connect"
+            errors = await self._validate_new_installation(user_input)
 
             if not errors:
                 return self.async_create_entry(
@@ -184,6 +164,24 @@ class SyncOrSwimMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ),
             errors=errors,
         )
+
+    async def _validate_new_installation(
+        self, user_input: dict[str, Any]
+    ) -> dict[str, str]:
+        """Check the installation ID and backend shared by producer and consumer."""
+        installation_id = user_input[CONF_INSTALLATION_ID]
+        errors: dict[str, str] = {}
+        if not INSTALLATION_ID_REGEX.fullmatch(installation_id):
+            errors[CONF_INSTALLATION_ID] = "invalid_installation_id"
+
+        await self.async_set_unique_id(installation_id)
+        self._abort_if_unique_id_configured()
+
+        if not errors and not await self._test_backend_url(
+            user_input[CONF_BACKEND_URL]
+        ):
+            errors["base"] = "cannot_connect"
+        return errors
 
     async def _test_backend_url(self, url: str) -> bool:
         try:
@@ -279,22 +277,15 @@ class SyncOrSwimOptionsFlowHandler(config_entries.OptionsFlowWithReload):
         )
 
 
-def _entry_value(
-    entry: config_entries.ConfigEntry, key: str, default: Any | None = None
-) -> Any:
-    if key in entry.options:
-        return entry.options[key]
-    return entry.data.get(key, default)
-
-
 def _reconfigure_schema(entry: config_entries.ConfigEntry) -> vol.Schema:
     role = entry.data[CONF_ROLE]
     fields: dict[Any, Any] = {
         vol.Required(
-            CONF_BACKEND_URL, default=_entry_value(entry, CONF_BACKEND_URL)
+            CONF_BACKEND_URL,
+            default=effective_entry_value(entry, CONF_BACKEND_URL, None),
         ): str,
         vol.Required(
-            CONF_PUSH_TOKEN, default=_entry_value(entry, CONF_PUSH_TOKEN)
+            CONF_PUSH_TOKEN, default=effective_entry_value(entry, CONF_PUSH_TOKEN, None)
         ): str,
     }
     if role == ROLE_PRODUCER:
@@ -302,7 +293,7 @@ def _reconfigure_schema(entry: config_entries.ConfigEntry) -> vol.Schema:
             {
                 vol.Required(
                     CONF_CAMERA_ENTITY,
-                    default=_entry_value(entry, CONF_CAMERA_ENTITY),
+                    default=effective_entry_value(entry, CONF_CAMERA_ENTITY, None),
                 ): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain="camera")
                 ),

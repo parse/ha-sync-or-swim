@@ -427,6 +427,25 @@ def test_problem_sensor_does_not_derive_state_without_backend_dosing_problem():
     assert problem.native_value is None
 
 
+def test_binary_problem_sensor_does_not_derive_state_without_backend_dosing_problem():
+    binary_sensor = load_module("binary_sensor")
+    entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())
+    coordinator = SimpleNamespace(
+        data=coordinator_data(
+            pool={
+                "chlorine": {"status": "warning"},
+                "ph": {"status": "ok"},
+            },
+            dosing_problem=None,
+        )
+    )
+    entry.runtime_data = coordinator
+
+    problem = binary_sensor.SyncOrSwimDosingProblemBinarySensor(coordinator, entry)
+
+    assert problem.is_on is None
+
+
 def test_button_name_is_sync_or_swim_prefixed():
     button = load_module("button")
     entry = SimpleNamespace(entry_id="entry-1", runtime_data=SimpleNamespace())

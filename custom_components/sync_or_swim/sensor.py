@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import INVALID_SHARED_SENSOR_STATES
 from .entry_types import SyncOrSwimConfigEntry, require_runtime_coordinator
 from .problem_attributes import (
     DOSING_PROBLEM_ERROR,
@@ -23,7 +24,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 UnitName = Literal["chlorine", "ph"]
-INVALID_SHARED_SENSOR_VALUES = {"unknown", "unavailable"}
 
 
 async def async_setup_entry(
@@ -104,25 +104,28 @@ class SyncOrSwimSharedSensor(CoordinatorEntity, SensorEntity):
         self._attr_state_class = sensor_data.get("state_class")
         self._attr_native_unit_of_measurement = sensor_data.get("unit")
 
-    @property
-    def native_value(self) -> Any:
-        sensors = self._coordinator.data.get("sensors", [])
-        for s in sensors:
-            if s["key"] == self._key:
-                value = s["value"]
-                return None if value in INVALID_SHARED_SENSOR_VALUES else value
+    def _sensor_data(self) -> dict[str, Any] | None:
+        for sensor in self._coordinator.data.get("sensors", []):
+            if sensor["key"] == self._key:
+                return cast(dict[str, Any], sensor)
         return None
 
     @property
+    def native_value(self) -> Any:
+        sensor = self._sensor_data()
+        if sensor is None or sensor["value"] in INVALID_SHARED_SENSOR_STATES:
+            return None
+        return sensor["value"]
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        sensors = self._coordinator.data.get("sensors", [])
-        for s in sensors:
-            if s["key"] == self._key:
-                return {
-                    "updated_at": s.get("updated_at"),
-                    "original_label": s.get("label"),
-                }
-        return {}
+        sensor = self._sensor_data()
+        if sensor is None:
+            return {}
+        return {
+            "updated_at": sensor.get("updated_at"),
+            "original_label": sensor.get("label"),
+        }
 
 
 class SyncOrSwimProblemSensor(CoordinatorEntity, SensorEntity):

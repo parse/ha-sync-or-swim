@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -11,7 +11,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import STATUS_ERROR, STATUS_WARNING
 from .entry_types import SyncOrSwimConfigEntry, require_runtime_coordinator
 from .problem_attributes import (
     DOSING_PROBLEM_ERROR,
@@ -52,32 +51,20 @@ class SyncOrSwimDosingProblemBinarySensor(CoordinatorEntity, BinarySensorEntity)
         if not data:
             return None
 
+        # The backend always sends dosing_problem; without it there is no state.
         dosing_problem = data.get("dosing_problem")
-        if dosing_problem:
-            state = dosing_problem.get("state")
-            if state in (DOSING_PROBLEM_WARNING, DOSING_PROBLEM_ERROR):
-                return True
-            if data.get("stale", False):
-                return True
-            if state == DOSING_PROBLEM_OK:
-                return False
+        if not dosing_problem:
             return None
 
-        pool = data.get("pool")
-        if not pool:
-            return cast(bool | None, data.get("stale", False))
-
-        chlorine_status = pool.get("chlorine", {}).get("status")
-        ph_status = pool.get("ph", {}).get("status")
-
-        if chlorine_status in (None, "unknown") or ph_status in (None, "unknown"):
-            return None
-
-        return (
-            chlorine_status in (STATUS_WARNING, STATUS_ERROR)
-            or ph_status in (STATUS_WARNING, STATUS_ERROR)
-            or data.get("stale", False)
-        )
+        state = dosing_problem.get("state")
+        if state in (DOSING_PROBLEM_WARNING, DOSING_PROBLEM_ERROR):
+            return True
+        # Local staleness covers readings kept while the backend is unreachable.
+        if data.get("stale", False):
+            return True
+        if state == DOSING_PROBLEM_OK:
+            return False
+        return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

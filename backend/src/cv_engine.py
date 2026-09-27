@@ -379,10 +379,12 @@ def privacy_mask_offsets() -> list[tuple[int, int]]:
 
 
 def detect_privacy_mask_timeout_with_shift_search(
-    hsv_images: list[np.ndarray], device: DeviceName
+    hsv_images: list[np.ndarray],
+    device: DeviceName,
+    privacy_rois: RoiMap = PRIVACY_MASK_ROIS,
 ) -> bool:
     for dx, dy in privacy_mask_offsets():
-        candidate_rois = shifted_device_rois(PRIVACY_MASK_ROIS[device], dx, dy)
+        candidate_rois = shifted_device_rois(privacy_rois[device], dx, dy)
         strengths_by_led = sample_device_strengths(hsv_images, candidate_rois)
         if has_timeout_led_pattern(lit_frames(strengths_by_led)):
             return True
@@ -470,14 +472,16 @@ def analyze_device_strengths(
 
 
 def best_privacy_mask_device_result(
-    hsv_images: list[np.ndarray], device: DeviceName
+    hsv_images: list[np.ndarray],
+    device: DeviceName,
+    privacy_rois: RoiMap = PRIVACY_MASK_ROIS,
 ) -> CVUnitAnalysisPayload:
     """Walk the ROI shift grid once, returning a timeout or the most confident read."""
     best_result = empty_unit_payload()
     best_confidence = -1.0
 
     for dx, dy in privacy_mask_offsets():
-        candidate_rois = shifted_device_rois(PRIVACY_MASK_ROIS[device], dx, dy)
+        candidate_rois = shifted_device_rois(privacy_rois[device], dx, dy)
         strengths_by_led = sample_device_strengths(hsv_images, candidate_rois)
         if has_timeout_led_pattern(lit_frames(strengths_by_led)):
             return timeout_result()
@@ -493,15 +497,19 @@ def best_privacy_mask_device_result(
 
 
 def analyze_privacy_mask_with_shift_search(
-    hsv_images: list[np.ndarray],
+    hsv_images: list[np.ndarray], privacy_rois: RoiMap = PRIVACY_MASK_ROIS
 ) -> CVAnalysisResult:
-    result = analyze_with_hsv_rois(hsv_images, PRIVACY_MASK_ROIS)
+    result = analyze_with_hsv_rois(hsv_images, privacy_rois)
 
     for device in DEVICE_NAMES:
         device_result = result[device]
         if device_result["level"] is None and device_result["mode"] == "unknown":
-            result[device] = best_privacy_mask_device_result(hsv_images, device)
-        elif detect_privacy_mask_timeout_with_shift_search(hsv_images, device):
+            result[device] = best_privacy_mask_device_result(
+                hsv_images, device, privacy_rois
+            )
+        elif detect_privacy_mask_timeout_with_shift_search(
+            hsv_images, device, privacy_rois
+        ):
             result[device] = timeout_result()
 
     return result
@@ -517,20 +525,33 @@ def best_analysis_result(
     return result
 
 
-def analyze_burst(images_bytes: list[bytes], rois: RoiMap = ROIS) -> CVAnalysisResult:
-    return analyze_frames([preprocess_image(img) for img in images_bytes], rois)
+def analyze_burst(
+    images_bytes: list[bytes],
+    rois: RoiMap = ROIS,
+    privacy_rois: RoiMap = PRIVACY_MASK_ROIS,
+) -> CVAnalysisResult:
+    return analyze_frames(
+        [preprocess_image(img) for img in images_bytes], rois, privacy_rois
+    )
 
 
 def analyze_frames(
-    processed_images: list[np.ndarray], rois: RoiMap = ROIS
+    processed_images: list[np.ndarray],
+    rois: RoiMap = ROIS,
+    privacy_rois: RoiMap = PRIVACY_MASK_ROIS,
 ) -> CVAnalysisResult:
-    """Analyze frames already decoded and cropped by preprocess_image."""
+    """Analyze frames already decoded and cropped by preprocess_image.
+
+    Colour frames are read with ``rois``. Grayscale privacy-mask frames are read
+    with ``privacy_rois``, but only when ``rois`` is the default, because custom
+    ``rois`` ask for exactly those regions to be analyzed.
+    """
     import cv2
 
     hsv_images = [cv2.cvtColor(img, cv2.COLOR_BGR2HSV) for img in processed_images]
 
     if rois is ROIS and is_grayscale_privacy_hsv_frame(hsv_images):
-        return analyze_privacy_mask_with_shift_search(hsv_images)
+        return analyze_privacy_mask_with_shift_search(hsv_images, privacy_rois)
 
     result = analyze_with_hsv_rois(hsv_images, rois)
 

@@ -1,4 +1,9 @@
+# Pinned so Dependabot's docker updates bump uv along with the base image.
+FROM ghcr.io/astral-sh/uv:0.12.19 AS uv
+
 FROM python:3.14-slim
+
+COPY --from=uv /uv /bin/uv
 
 WORKDIR /app
 
@@ -8,14 +13,19 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install the locked runtime dependencies into /app/.venv with the image's
+# Python, before copying the code so this layer is reused across code changes.
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev --no-cache
 
 # CI smoke-tests this image through scripts/validate_docker.sh.
 COPY . .
 
-# Set python path to include src
-ENV PYTHONPATH=/app/src
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH=/app/src
 
 EXPOSE 8000
 

@@ -103,7 +103,7 @@ assignment in `cv_engine.py`.
 After patching, run:
 
 ```bash
-pytest backend/tests/test_cv_fixtures.py -q
+uv run --project backend pytest backend/tests/test_cv_fixtures.py -q
 ```
 
 If a new authoritative fixture has been added, make sure its expected result

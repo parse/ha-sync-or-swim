@@ -18,12 +18,14 @@ Sync your pool data or swim alone! Monitor your pool dosing units and share gene
 - Backend server (Python/FastAPI)
 
 ## Quality Gates
-The repository's validation workflow runs:
-- `ruff check custom_components backend scripts`
-- `ruff format --check custom_components backend scripts`
-- `mypy backend/src custom_components/sync_or_swim`
-- `python scripts/generate_api_types.py --check`
-- `pytest`
+Backend and tooling dependencies are locked with [uv](https://docs.astral.sh/uv/)
+in `backend/uv.lock`. Run `uv sync --project backend` to set up, then the
+validation workflow runs:
+- `uv run --project backend ruff check custom_components backend scripts`
+- `uv run --project backend ruff format --check custom_components backend scripts`
+- `uv run --project backend mypy backend/src custom_components/sync_or_swim`
+- `uv run --project backend python scripts/generate_api_types.py --check`
+- `uv run --project backend pytest`
 - HACS validation
 - hassfest validation
 

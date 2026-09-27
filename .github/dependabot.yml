@@ -11,7 +11,13 @@ updates:
     schedule:
       interval: 'weekly'
 
-  - package-ecosystem: 'pip'
-    directory: 'backend/'
+  - package-ecosystem: 'uv'
+    directory: '/backend'
     schedule:
       interval: 'weekly'
+    groups:
+      # One weekly PR for minor/patch bumps; major versions stay separate.
+      python-minor-and-patch:
+        update-types:
+          - 'minor'
+          - 'patch'

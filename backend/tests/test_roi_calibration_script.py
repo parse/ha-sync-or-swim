@@ -56,7 +56,7 @@ def test_privacy_mask_calibration_rois_are_valid_and_read_led4():
     assert len(result.proposed_rois["ph"]) == 7
 
     images = [path.read_bytes() for path in sorted(FIXTURE_DIR.glob("*.jpg"))]
-    analyzed = analyze_burst(images, rois=result.proposed_rois)
+    analyzed = analyze_burst(images, privacy_rois=result.proposed_rois)
 
     assert analyzed["chlorine"]["level"] == 4
     assert analyzed["chlorine"]["led_states"] == [

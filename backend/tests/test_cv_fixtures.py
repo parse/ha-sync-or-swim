@@ -37,16 +37,15 @@ def test_cv_logic_fixtures(case: FixtureCase, fixture_image_loader):
         )
 
 
-def test_privacy_mask_search_recovers_small_roi_shift(
-    fixture_image_loader, monkeypatch
-):
+def test_privacy_mask_search_recovers_small_roi_shift(fixture_image_loader):
     shifted_rois = {
         device: cv_engine.shifted_device_rois(rois, -8, 0)
         for device, rois in cv_engine.PRIVACY_MASK_ROIS.items()
     }
-    monkeypatch.setattr(cv_engine, "PRIVACY_MASK_ROIS", shifted_rois)
 
-    result = analyze_burst(fixture_image_loader("burst_14_light_off_bw"))
+    result = analyze_burst(
+        fixture_image_loader("burst_14_light_off_bw"), privacy_rois=shifted_rois
+    )
 
     assert result["chlorine"]["level"] == 4
     assert result["chlorine"]["status"] == "ok"

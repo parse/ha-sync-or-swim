@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+from collections.abc import Awaitable, Callable
 from time import monotonic
 from typing import Any
 from uuid import uuid4
@@ -14,6 +15,12 @@ from .contract_validation import LatestMeasurement, validate_latest_measurement
 
 _LOGGER = logging.getLogger(__name__)
 _RETRYABLE_STATUSES = {429, 500, 502, 503, 504}
+_MAX_RETRY_DELAY_SECONDS = 8.0
+
+
+def retry_delay_seconds(attempt: int, jitter: float) -> float:
+    """Return the capped exponential backoff before retrying after ``attempt``."""
+    return min(_MAX_RETRY_DELAY_SECONDS, 2.0 ** (attempt - 1) + jitter)
 
 
 class SyncOrSwimApiError(Exception):
@@ -36,6 +43,7 @@ class SyncOrSwimApiClient:
         sensor_push_connect_timeout: float = 10,
         sensor_push_total_timeout: float = 30,
         sensor_push_attempts: int = 3,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._backend_url = backend_url.rstrip("/")
         self._token = token
@@ -45,6 +53,7 @@ class SyncOrSwimApiClient:
             total=sensor_push_total_timeout,
         )
         self._sensor_push_attempts = sensor_push_attempts
+        self._sleep = sleep
 
     def _auth_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._token}"} if self._token else {}
@@ -175,8 +184,7 @@ class SyncOrSwimApiClient:
 
     async def _retry_delay(self, attempt: int) -> None:
         """Wait using capped exponential backoff with jitter."""
-        delay = min(8.0, 2 ** (attempt - 1) + random.uniform(0, 0.5))
-        await asyncio.sleep(delay)
+        await self._sleep(retry_delay_seconds(attempt, random.uniform(0, 0.5)))
 
     def _log_sensor_push(
         self,

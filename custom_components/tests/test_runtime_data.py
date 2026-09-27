@@ -158,8 +158,9 @@ def stub_modules():
     ].OptionsFlowWithReload = StubOptionsFlowWithReload
     modules["homeassistant.core"].HomeAssistant = object
     modules["homeassistant.core"].callback = lambda func: func
+    # Like Home Assistant's shared session, the fake lives on (fake) hass.
     modules["homeassistant.helpers.aiohttp_client"].async_get_clientsession = (
-        lambda hass: None
+        lambda hass: getattr(hass, "client_session", None)
     )
     modules["homeassistant.helpers.entity_platform"].AddEntitiesCallback = object
     modules["homeassistant.helpers.selector"].EntitySelector = StubEntitySelector
@@ -208,14 +209,42 @@ def load_module(module_name):
     return importlib.import_module(f"custom_components.sync_or_swim.{module_name}")
 
 
-def make_flow(config_flow):
+class FakeHealthResponse:
+    def __init__(self, status):
+        self.status = status
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return None
+
+
+class FakeHealthSession:
+    """Records backend health checks and answers with a fixed status."""
+
+    def __init__(self, status):
+        self.status = status
+        self.calls = []
+
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return FakeHealthResponse(self.status)
+
+
+def make_flow(config_flow, backend_status=200):
     flow = config_flow.SyncOrSwimMonitorConfigFlow()
     flow.hass = SimpleNamespace(
         states={
             "camera.pool": object(),
-        }
+        },
+        client_session=FakeHealthSession(backend_status),
     )
     return flow
+
+
+def health_checks(flow):
+    return [url for url, _ in flow.hass.client_session.calls]
 
 
 @pytest.mark.asyncio
@@ -321,19 +350,15 @@ async def test_migrate_entry_moves_runtime_settings_to_options():
 
 
 @pytest.mark.asyncio
-async def test_config_flow_user_routes_to_role_specific_step(monkeypatch):
+@pytest.mark.parametrize("role", ["producer", "consumer"])
+async def test_config_flow_user_routes_to_role_specific_step(role):
     config_flow = load_module("config_flow")
-    flow = config_flow.SyncOrSwimMonitorConfigFlow()
-    producer = AsyncMock(return_value="producer-step")
-    consumer = AsyncMock(return_value="consumer-step")
-    monkeypatch.setattr(flow, "async_step_producer", producer)
-    monkeypatch.setattr(flow, "async_step_consumer", consumer)
+    flow = make_flow(config_flow)
 
-    result = await flow.async_step_user({"role": "consumer"})
+    result = await flow.async_step_user({"role": role})
 
-    assert result == "consumer-step"
-    consumer.assert_awaited_once()
-    producer.assert_not_awaited()
+    assert result["type"] == "form"
+    assert result["step_id"] == role
 
 
 def test_shared_sensor_update_from_state_skips_unavailable_values():
@@ -408,27 +433,9 @@ def test_shared_sensor_interval_parser_rejects_invalid_lines():
 
 
 @pytest.mark.asyncio
-async def test_config_flow_producer_creates_entry(monkeypatch):
+async def test_config_flow_producer_creates_entry():
     config_flow = load_module("config_flow")
     flow = make_flow(config_flow)
-
-    backend = AsyncMock(return_value=True)
-    created = {}
-
-    async def fake_set_unique_id(value):
-        created["unique_id"] = value
-
-    def fake_abort():
-        created["aborted"] = True
-
-    def fake_create_entry(**kwargs):
-        created.update(kwargs)
-        return {"type": "create_entry", **kwargs}
-
-    monkeypatch.setattr(flow, "async_set_unique_id", fake_set_unique_id)
-    monkeypatch.setattr(flow, "_abort_if_unique_id_configured", fake_abort)
-    monkeypatch.setattr(flow, "_test_backend_url", backend)
-    monkeypatch.setattr(flow, "async_create_entry", fake_create_entry)
 
     result = await flow.async_step_producer(
         {
@@ -442,19 +449,18 @@ async def test_config_flow_producer_creates_entry(monkeypatch):
     )
 
     assert result["type"] == "create_entry"
-    assert created["title"] == "pool-1"
-    assert created["data"]["installation_id"] == "pool-1"
-    assert created["data"]["camera_entity"] == "camera.pool"
-    assert "scan_interval" not in created["data"]
-    assert created["options"]["scan_interval"] == 45
-    assert created["options"]["installation_enabled"] is True
-    assert created["unique_id"] == "pool-1"
-    assert created["aborted"] is True
-    backend.assert_awaited_once_with("http://backend")
+    assert result["title"] == "pool-1"
+    assert result["data"]["installation_id"] == "pool-1"
+    assert result["data"]["camera_entity"] == "camera.pool"
+    assert "scan_interval" not in result["data"]
+    assert result["options"]["scan_interval"] == 45
+    assert result["options"]["installation_enabled"] is True
+    assert flow._unique_id == "pool-1"
+    assert health_checks(flow) == ["http://backend/api/health"]
 
 
 @pytest.mark.asyncio
-async def test_reconfigure_updates_existing_entry_without_installation_id(monkeypatch):
+async def test_reconfigure_updates_existing_entry_without_installation_id():
     config_flow = load_module("config_flow")
     flow = make_flow(config_flow)
     flow._reconfigure_entry = SimpleNamespace(
@@ -467,8 +473,6 @@ async def test_reconfigure_updates_existing_entry_without_installation_id(monkey
         },
         options={},
     )
-    backend = AsyncMock(return_value=True)
-    monkeypatch.setattr(flow, "_test_backend_url", backend)
 
     result = await flow.async_step_reconfigure(
         {
@@ -482,15 +486,13 @@ async def test_reconfigure_updates_existing_entry_without_installation_id(monkey
     assert flow._reconfigure_entry.data["installation_id"] == "pool-1"
     assert flow._reconfigure_entry.data["backend_url"] == "http://new-backend"
     assert flow._reconfigure_entry.data["push_token"] == "new-token"
-    backend.assert_awaited_once_with("http://new-backend")
+    assert health_checks(flow) == ["http://new-backend/api/health"]
 
 
 @pytest.mark.asyncio
-async def test_config_flow_consumer_creates_entry(monkeypatch):
+async def test_config_flow_consumer_creates_entry():
     config_flow = load_module("config_flow")
     flow = make_flow(config_flow)
-    backend = AsyncMock(return_value=True)
-    monkeypatch.setattr(flow, "_test_backend_url", backend)
 
     result = await flow.async_step_consumer(
         {
@@ -507,7 +509,7 @@ async def test_config_flow_consumer_creates_entry(monkeypatch):
     assert result["data"]["installation_id"] == "pool-1"
     assert "poll_interval" not in result["data"]
     assert result["options"]["poll_interval"] == 15
-    backend.assert_awaited_once_with("http://backend")
+    assert health_checks(flow) == ["http://backend/api/health"]
 
 
 @pytest.mark.asyncio
@@ -643,27 +645,23 @@ async def test_options_flow_consumer_stores_poll_interval():
     ],
 )
 async def test_config_flow_rejects_invalid_installation_id(
-    monkeypatch, step_name, user_input, expected_step
+    step_name, user_input, expected_step
 ):
     config_flow = load_module("config_flow")
     flow = make_flow(config_flow)
-    backend = AsyncMock(return_value=True)
-    monkeypatch.setattr(flow, "_test_backend_url", backend)
 
     result = await getattr(flow, step_name)(user_input)
 
     assert result["type"] == "form"
     assert result["step_id"] == expected_step
     assert result["errors"] == {"installation_id": "invalid_installation_id"}
-    backend.assert_not_awaited()
+    assert health_checks(flow) == []
 
 
 @pytest.mark.asyncio
-async def test_config_flow_reports_backend_connection_failure(monkeypatch):
+async def test_config_flow_reports_backend_connection_failure():
     config_flow = load_module("config_flow")
-    flow = make_flow(config_flow)
-    backend = AsyncMock(return_value=False)
-    monkeypatch.setattr(flow, "_test_backend_url", backend)
+    flow = make_flow(config_flow, backend_status=500)
 
     result = await flow.async_step_consumer(
         {
@@ -678,62 +676,55 @@ async def test_config_flow_reports_backend_connection_failure(monkeypatch):
     assert result["type"] == "form"
     assert result["step_id"] == "consumer"
     assert result["errors"] == {"base": "cannot_connect"}
-    backend.assert_awaited_once_with("http://backend")
+    assert health_checks(flow) == ["http://backend/api/health"]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("status", "expected"), [(200, True), (500, False)])
-async def test_config_flow_backend_check_uses_shared_session(
-    monkeypatch, status, expected
-):
+async def test_config_flow_backend_check_uses_shared_session(status, expected):
     config_flow = load_module("config_flow")
-    flow = make_flow(config_flow)
-
-    class FakeResponse:
-        def __init__(self, response_status):
-            self.status = response_status
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return None
-
-    class FakeSession:
-        def __init__(self):
-            self.calls = []
-
-        def get(self, url, **kwargs):
-            self.calls.append((url, kwargs))
-            return FakeResponse(status)
-
-    session = FakeSession()
-    monkeypatch.setattr(
-        config_flow,
-        "async_get_clientsession",
-        lambda hass: session,
-    )
+    flow = make_flow(config_flow, backend_status=status)
 
     assert await flow._test_backend_url("http://backend/") is expected
-    assert session.calls == [("http://backend/api/health", {"timeout": 10})]
+    assert flow.hass.client_session.calls == [
+        ("http://backend/api/health", {"timeout": 10})
+    ]
 
 
 @pytest.mark.asyncio
-async def test_config_flow_aborts_duplicate_installation():
-    config_flow = load_module("config_flow")
-    flow = make_flow(config_flow)
-    flow._duplicate_configured = True
-
-    with pytest.raises(DuplicateEntryConfigured):
-        await flow.async_step_consumer(
+@pytest.mark.parametrize(
+    ("step_name", "user_input"),
+    [
+        (
+            "async_step_producer",
+            {
+                "installation_id": "pool-1",
+                "camera_entity": "camera.pool",
+                "push_token": "token",
+                "backend_url": "http://backend",
+            },
+        ),
+        (
+            "async_step_consumer",
             {
                 "installation_id": "pool-1",
                 "push_token": "token",
                 "backend_url": "http://backend",
                 "poll_interval": 15,
                 "staleness_threshold": 90,
-            }
-        )
+            },
+        ),
+    ],
+)
+async def test_config_flow_aborts_duplicate_installation(step_name, user_input):
+    config_flow = load_module("config_flow")
+    flow = make_flow(config_flow)
+    flow._duplicate_configured = True
+
+    with pytest.raises(DuplicateEntryConfigured):
+        await getattr(flow, step_name)(user_input)
+
+    assert health_checks(flow) == []
 
 
 def producer_entry(**overrides):

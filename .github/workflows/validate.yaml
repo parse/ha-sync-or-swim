@@ -40,25 +40,25 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Read Python version
-        id: python-version
-        run: echo "version=$(awk '$1 == \"python\" { print $2 }' .tool-versions)" >> "$GITHUB_OUTPUT"
+      - name: Read tool versions
+        id: tool-versions
+        run: |
+          echo "python=$(awk '$1 == \"python\" { print $2 }' .tool-versions)" >> "$GITHUB_OUTPUT"
+          echo "uv=$(awk '$1 == \"uv\" { print $2 }' .tool-versions)" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-python@v7
+      - uses: astral-sh/setup-uv@v10.2.0
         with:
-          python-version: ${{ steps.python-version.outputs.version }}
-          cache: pip
-          cache-dependency-path: |
-            backend/requirements.txt
-            backend/requirements-dev.txt
+          version: ${{ steps.tool-versions.outputs.uv }}
+          python-version: ${{ steps.tool-versions.outputs.python }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
 
       - name: Install backend dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+        # --locked fails if uv.lock is out of date with backend/pyproject.toml.
+        run: uv sync --project backend --locked
 
       - name: Run validation script
-        run: bash scripts/validate_python.sh
+        run: uv run --project backend --locked bash scripts/validate_python.sh
 
   docker-build-and-smoke:
     runs-on: ubuntu-latest

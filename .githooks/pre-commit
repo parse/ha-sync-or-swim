@@ -1,4 +1,9 @@
 #!/bin/sh
 
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv is not installed or not on PATH; run 'mise install' (see .tool-versions)."
+  exit 1
+fi
+
 echo "Running validation..."
-scripts/validate_python.sh
+uv run --project backend --locked scripts/validate_python.sh

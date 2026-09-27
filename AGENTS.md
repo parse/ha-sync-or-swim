@@ -46,10 +46,14 @@ when practical. If verification cannot be run, say what was skipped and why.
 
 ## Quality Checks
 
+Python dependencies are managed with uv and locked in `backend/uv.lock`.
+Run `uv sync --project backend` once to create `backend/.venv`, and use
+`uv add --project backend <package>` (or `--dev`) to change dependencies.
+
 Use the relevant local checks for the files you changed. Common checks include:
 
-- `ruff check custom_components backend scripts`
-- `ruff format --check custom_components backend scripts`
-- `mypy backend/src custom_components/sync_or_swim`
-- `python scripts/generate_api_types.py --check`
-- `pytest`
+- `uv run --project backend ruff check custom_components backend scripts`
+- `uv run --project backend ruff format --check custom_components backend scripts`
+- `uv run --project backend mypy backend/src custom_components/sync_or_swim`
+- `uv run --project backend python scripts/generate_api_types.py --check`
+- `uv run --project backend pytest`

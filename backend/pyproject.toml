@@ -1,0 +1,33 @@
+[project]
+name = "syncorswim-backend"
+version = "1.0.0"
+description = "SyncOrSwim backend: LED analysis, measurements and shared sensors"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.141.1",
+    "numpy>=2.5.3",
+    "opencv-python-headless>=5.0.0.93",
+    "pillow>=12.3.0",
+    "psycopg2-binary>=2.9.13",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
+    "qrcode>=8.2",
+    "sqlalchemy>=2.1.1",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.uv]
+# The backend is an application run from src/, not an installable package.
+package = false
+
+[dependency-groups]
+dev = [
+    "datamodel-code-generator>=0.83.0",
+    "httpx>=0.28.1",
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.9",
+    "types-qrcode>=8.2.0.20260518",
+]

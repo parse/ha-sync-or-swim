@@ -20,7 +20,6 @@ from schemas.models import (
     SharedSensorUpdateSchema,
     validate_installation_id,
 )
-from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -122,7 +121,7 @@ async def get_installations(
     db: Session = Depends(get_db), _auth: None = Depends(verify_token)
 ) -> list[InstallationResponseSchema]:
     all_installations = (
-        db.query(Installation).order_by(desc(Installation.last_seen)).all()
+        db.query(Installation).order_by(Installation.last_seen.desc()).all()
     )
 
     return [

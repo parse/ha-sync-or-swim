@@ -16,7 +16,6 @@ from routes.installations import (
     render_sensors_fragment,
 )
 from schemas.models import validate_installation_id
-from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 router = APIRouter()
@@ -144,7 +143,7 @@ async def get_latest_pool_status_fragment(
     measurement = (
         db.query(Measurement)
         .filter(Measurement.installation_id == installation_id)
-        .order_by(desc(Measurement.captured_at))
+        .order_by(Measurement.captured_at.desc())
         .first()
     )
     if measurement is None:

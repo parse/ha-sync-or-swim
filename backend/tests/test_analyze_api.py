@@ -69,7 +69,7 @@ def test_analyze_burst_endpoint_stores_latest(
 
 
 @pytest.mark.parametrize("case", fixture_case_params())
-def test_legacy_latest_endpoint_alias_still_works(
+def test_analyze_burst_result_is_served_by_latest_endpoint(
     case: FixtureCase, multipart_files_builder
 ):
     response = client.post(

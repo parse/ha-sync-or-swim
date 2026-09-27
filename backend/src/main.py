@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,6 +12,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from request_timing import elapsed_ms, log_timing
 from routes import analyze, installations, latest, ui
+
+# Uvicorn configures only its own loggers. Without this, the app's INFO timing
+# events are dropped and warnings fall back to Python's last-resort handler.
+logging.basicConfig(
+    level=logging.WARNING, format="%(levelname)s: %(name)s: %(message)s"
+)
+logging.getLogger("sync_or_swim").setLevel(logging.INFO)
 
 
 @asynccontextmanager

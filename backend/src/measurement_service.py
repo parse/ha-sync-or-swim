@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from time import perf_counter
-from typing import cast
+from typing import Any, Literal, cast
 
 from db.models import Installation, Measurement, SharedSensor
 from request_timing import elapsed_ms, log_timing
@@ -20,6 +20,31 @@ from schemas.models import (
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
+
+UnitName = Literal["chlorine", "ph"]
+
+# UnitAnalysis field -> Measurement column suffix; columns are "<unit>_<suffix>".
+UNIT_COLUMN_SUFFIXES = {
+    "status": "status",
+    "diagnosis": "diagnosis",
+    "pattern_detected": "pattern",
+    "blinking_leds": "blinking",
+    "solid_leds": "solid",
+    "summary": "summary",
+    "action_required": "action",
+    "recommended_action": "recommended",
+}
+
+DISABLED_UNIT = UnitAnalysis(
+    status="ok",
+    diagnosis=None,
+    pattern_detected="disabled",
+    blinking_leds=[],
+    solid_leds=[],
+    summary="Installation disabled",
+    action_required=False,
+    recommended_action="No action needed",
+)
 
 # Home Assistant friendly names that say what is measured but not where.
 GENERIC_SHARED_SENSOR_LABELS = {
@@ -71,8 +96,6 @@ def dosing_problem_from_statuses(
         return "Warning"
     if statuses == ("ok", "ok"):
         return "OK"
-    if any(status in (None, "unknown") for status in statuses):
-        return None
     return None
 
 
@@ -192,8 +215,10 @@ def latest_schema_from_measurement(
         if staleness_threshold_minutes is not None
         else False
     )
-    chlorine_status = status_from_db(measurement.chlorine_status)
-    ph_status = status_from_db(measurement.ph_status)
+    chlorine = _unit_from_columns(measurement, "chlorine")
+    ph = _unit_from_columns(measurement, "ph")
+    chlorine_status = chlorine.status
+    ph_status = ph.status
     dosing_problem_reason = dosing_problem_reason_from_statuses(
         chlorine_status, ph_status, stale
     )
@@ -202,28 +227,7 @@ def latest_schema_from_measurement(
         installation_id=measurement.installation_id,
         captured_at=measurement.captured_at,
         pushed_at=measurement.pushed_at,
-        pool=PoolAnalysisSchema(
-            chlorine=UnitAnalysis(
-                status=chlorine_status,
-                diagnosis=measurement.chlorine_diagnosis,
-                pattern_detected=measurement.chlorine_pattern,
-                blinking_leds=measurement.chlorine_blinking or [],
-                solid_leds=measurement.chlorine_solid or [],
-                summary=measurement.chlorine_summary or "",
-                action_required=measurement.chlorine_action,
-                recommended_action=measurement.chlorine_recommended or "",
-            ),
-            ph=UnitAnalysis(
-                status=ph_status,
-                diagnosis=measurement.ph_diagnosis,
-                pattern_detected=measurement.ph_pattern,
-                blinking_leds=measurement.ph_blinking or [],
-                solid_leds=measurement.ph_solid or [],
-                summary=measurement.ph_summary or "",
-                action_required=measurement.ph_action,
-                recommended_action=measurement.ph_recommended or "",
-            ),
-        ),
+        pool=PoolAnalysisSchema(chlorine=chlorine, ph=ph),
         dosing_problem=DosingProblemSchema(
             state=dosing_problem_from_statuses(chlorine_status, ph_status, stale),
             reason=dosing_problem_reason,
@@ -234,6 +238,30 @@ def latest_schema_from_measurement(
         ),
         sensors=sensor_schemas,
         raw_response=measurement.raw_response,
+    )
+
+
+def _unit_columns(unit_name: UnitName, unit: UnitAnalysis) -> dict[str, Any]:
+    values = unit.model_dump()
+    return {
+        f"{unit_name}_{suffix}": values[field]
+        for field, suffix in UNIT_COLUMN_SUFFIXES.items()
+    }
+
+
+def _unit_from_columns(measurement: Measurement, unit_name: UnitName) -> UnitAnalysis:
+    def column(suffix: str) -> Any:
+        return getattr(measurement, f"{unit_name}_{suffix}")
+
+    return UnitAnalysis(
+        status=status_from_db(column("status")),
+        diagnosis=column("diagnosis"),
+        pattern_detected=column("pattern"),
+        blinking_leds=column("blinking") or [],
+        solid_leds=column("solid") or [],
+        summary=column("summary") or "",
+        action_required=column("action"),
+        recommended_action=column("recommended") or "",
     )
 
 
@@ -298,38 +326,39 @@ def store_cv_result(
     cv_result: CVAnalysisResult,
     captured_at: datetime | None = None,
 ) -> LatestMeasurementSchema:
-    captured_at = captured_at or datetime.now(timezone.utc)
+    return _store_measurement(
+        db,
+        installation_id,
+        unit_from_cv(cv_result["chlorine"]),
+        unit_from_cv(cv_result["ph"]),
+        captured_at,
+    )
+
+
+def store_disabled_measurement(
+    db: Session,
+    installation_id: str,
+    captured_at: datetime | None = None,
+) -> LatestMeasurementSchema:
+    return _store_measurement(
+        db, installation_id, DISABLED_UNIT, DISABLED_UNIT, captured_at
+    )
+
+
+def _store_measurement(
+    db: Session,
+    installation_id: str,
+    chlorine: UnitAnalysis,
+    ph: UnitAnalysis,
+    captured_at: datetime | None,
+) -> LatestMeasurementSchema:
     now = datetime.now(timezone.utc)
-
-    installation = db.get(Installation, installation_id)
-    if installation is None:
-        installation = Installation(id=installation_id, last_seen=now)
-        db.add(installation)
-    else:
-        installation.last_seen = now
-
-    chlorine = unit_from_cv(cv_result["chlorine"])
-    ph = unit_from_cv(cv_result["ph"])
-
+    installation = _touch_installation(db, installation_id, now)
     measurement = Measurement(
         installation_id=installation_id,
-        captured_at=captured_at,
-        chlorine_status=chlorine.status,
-        chlorine_diagnosis=chlorine.diagnosis,
-        chlorine_pattern=chlorine.pattern_detected,
-        chlorine_blinking=chlorine.blinking_leds,
-        chlorine_solid=chlorine.solid_leds,
-        chlorine_summary=chlorine.summary,
-        chlorine_action=chlorine.action_required,
-        chlorine_recommended=chlorine.recommended_action,
-        ph_status=ph.status,
-        ph_diagnosis=ph.diagnosis,
-        ph_pattern=ph.pattern_detected,
-        ph_blinking=ph.blinking_leds,
-        ph_solid=ph.solid_leds,
-        ph_summary=ph.summary,
-        ph_action=ph.action_required,
-        ph_recommended=ph.recommended_action,
+        captured_at=captured_at or now,
+        **_unit_columns("chlorine", chlorine),
+        **_unit_columns("ph", ph),
         raw_response=None,
     )
     db.add(measurement)
@@ -337,6 +366,18 @@ def store_cv_result(
     db.refresh(measurement)
 
     return latest_schema_from_measurement(measurement, installation.shared_sensors)
+
+
+def _touch_installation(
+    db: Session, installation_id: str, now: datetime
+) -> Installation:
+    installation = db.get(Installation, installation_id)
+    if installation is None:
+        installation = Installation(id=installation_id, last_seen=now)
+        db.add(installation)
+    else:
+        installation.last_seen = now
+    return installation
 
 
 def store_shared_sensors(
@@ -418,46 +459,3 @@ def _upsert_shared_sensors(
                 },
             )
         )
-
-
-def store_disabled_measurement(
-    db: Session,
-    installation_id: str,
-    captured_at: datetime | None = None,
-) -> LatestMeasurementSchema:
-    captured_at = captured_at or datetime.now(timezone.utc)
-    now = datetime.now(timezone.utc)
-
-    installation = db.get(Installation, installation_id)
-    if installation is None:
-        installation = Installation(id=installation_id, last_seen=now)
-        db.add(installation)
-    else:
-        installation.last_seen = now
-
-    measurement = Measurement(
-        installation_id=installation_id,
-        captured_at=captured_at,
-        chlorine_status="ok",
-        chlorine_diagnosis=None,
-        chlorine_pattern="disabled",
-        chlorine_blinking=[],
-        chlorine_solid=[],
-        chlorine_summary="Installation disabled",
-        chlorine_action=False,
-        chlorine_recommended="No action needed",
-        ph_status="ok",
-        ph_diagnosis=None,
-        ph_pattern="disabled",
-        ph_blinking=[],
-        ph_solid=[],
-        ph_summary="Installation disabled",
-        ph_action=False,
-        ph_recommended="No action needed",
-        raw_response=None,
-    )
-    db.add(measurement)
-    db.commit()
-    db.refresh(measurement)
-
-    return latest_schema_from_measurement(measurement, installation.shared_sensors)

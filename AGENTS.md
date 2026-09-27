@@ -55,5 +55,6 @@ Use the relevant local checks for the files you changed. Common checks include:
 - `uv run --project backend ruff check custom_components backend scripts`
 - `uv run --project backend ruff format --check custom_components backend scripts`
 - `uv run --project backend mypy backend/src custom_components/sync_or_swim`
+- `uv run --project backend deptry backend/src --config backend/pyproject.toml`
 - `uv run --project backend python scripts/generate_api_types.py --check`
 - `uv run --project backend pytest`

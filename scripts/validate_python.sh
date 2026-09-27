@@ -8,6 +8,7 @@ if [ "${CI:-}" = "true" ]; then
   python -m ruff check custom_components backend scripts
   python -m ruff format --check custom_components backend scripts
   python -m mypy backend/src custom_components/sync_or_swim
+  python -m deptry backend/src --config backend/pyproject.toml
   python scripts/generate_api_types.py --check
   python -m compileall -q backend/src custom_components/sync_or_swim scripts
 
@@ -49,6 +50,7 @@ run_check() {
 run_check "ruff" python -m ruff check custom_components backend scripts
 run_check "format" python -m ruff format --check custom_components backend scripts
 run_check "mypy" python -m mypy backend/src custom_components/sync_or_swim
+run_check "deps" python -m deptry backend/src --config backend/pyproject.toml
 run_check "api types" python scripts/generate_api_types.py --check
 run_check "compile" python -m compileall -q backend/src custom_components/sync_or_swim scripts
 run_check "tests" env \

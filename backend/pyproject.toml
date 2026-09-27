@@ -7,10 +7,8 @@ dependencies = [
     "fastapi>=0.141.1",
     "numpy>=2.5.3",
     "opencv-python-headless>=5.0.0.93",
-    "pillow>=12.3.0",
     "psycopg2-binary>=2.9.13",
     "pydantic>=2.13.5",
-    "pydantic-settings>=2.15.0",
     "python-multipart>=0.0.32",
     "qrcode>=8.2",
     "sqlalchemy>=2.1.1",
@@ -24,6 +22,7 @@ package = false
 [dependency-groups]
 dev = [
     "datamodel-code-generator>=0.83.0",
+    "deptry>=0.25.1",
     "httpx>=0.28.1",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
@@ -31,3 +30,8 @@ dev = [
     "ruff>=0.16.9",
     "types-qrcode>=8.2.0.20260518",
 ]
+
+[tool.deptry.per_rule_ignores]
+# Used without being imported: SQLAlchemy loads psycopg2 from the
+# postgresql+psycopg2:// URL, and FastAPI needs python-multipart for uploads.
+DEP002 = ["psycopg2-binary", "python-multipart"]

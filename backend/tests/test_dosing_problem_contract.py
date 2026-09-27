@@ -249,3 +249,14 @@ def test_unit_from_cv_recommends_specific_actions(
 
     assert unit.action_required is expected_action_required
     assert unit.recommended_action == expected_recommended_action
+
+
+def test_unit_column_suffixes_cover_every_unit_field_and_column():
+    from db.models import Measurement
+    from measurement_service import UNIT_COLUMN_SUFFIXES
+    from schemas.models import UnitAnalysis
+
+    assert set(UNIT_COLUMN_SUFFIXES) == set(UnitAnalysis.model_fields)
+    for unit_name in ("chlorine", "ph"):
+        for suffix in UNIT_COLUMN_SUFFIXES.values():
+            assert hasattr(Measurement, f"{unit_name}_{suffix}")

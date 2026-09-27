@@ -250,19 +250,16 @@ def _unit_columns(unit_name: UnitName, unit: UnitAnalysis) -> dict[str, Any]:
 
 
 def _unit_from_columns(measurement: Measurement, unit_name: UnitName) -> UnitAnalysis:
-    def column(suffix: str) -> Any:
-        return getattr(measurement, f"{unit_name}_{suffix}")
-
-    return UnitAnalysis(
-        status=status_from_db(column("status")),
-        diagnosis=column("diagnosis"),
-        pattern_detected=column("pattern"),
-        blinking_leds=column("blinking") or [],
-        solid_leds=column("solid") or [],
-        summary=column("summary") or "",
-        action_required=column("action"),
-        recommended_action=column("recommended") or "",
-    )
+    values = {
+        field: getattr(measurement, f"{unit_name}_{suffix}")
+        for field, suffix in UNIT_COLUMN_SUFFIXES.items()
+    }
+    values["status"] = status_from_db(values["status"])
+    for field in ("blinking_leds", "solid_leds"):
+        values[field] = values[field] or []
+    for field in ("summary", "recommended_action"):
+        values[field] = values[field] or ""
+    return UnitAnalysis.model_validate(values)
 
 
 def latest_measurement(db: Session, installation_id: str) -> Measurement | None:

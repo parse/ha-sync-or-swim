@@ -9,14 +9,22 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+
+def normalize_database_url(url: str) -> str:
+    """Pin PostgreSQL URLs to psycopg2, the driver installed for the backend.
+
+    SQLAlchemy 2.1 maps bare postgresql:// URLs to psycopg (v3) instead.
+    """
+    for prefix in ("postgres://", "postgresql://"):
+        if url.startswith(prefix):
+            return "postgresql+psycopg2://" + url.removeprefix(prefix)
+    return url
+
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set")
-
-# If it's postgresql://, change to postgresql+psycopg2:// if needed,
-# though psycopg2 is often the default.
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+DATABASE_URL = normalize_database_url(DATABASE_URL)
 
 engine_kwargs: dict[str, Any] = {}
 if DATABASE_URL == "sqlite+pysqlite:///:memory:":

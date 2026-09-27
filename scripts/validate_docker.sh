@@ -28,6 +28,14 @@ docker build -t "$IMAGE_TAG" backend
 
 cleanup
 
+# Production uses PostgreSQL; creating the engine imports its driver without
+# connecting, so this catches a missing driver before deploy.
+echo "Checking the PostgreSQL driver imports..."
+docker run --rm \
+  -e DATABASE_URL=postgresql://user@localhost/syncorswim \
+  "$IMAGE_TAG" \
+  python -c "import db.session"
+
 echo "Starting Docker container ${CONTAINER_NAME}..."
 if [ -n "$HOST_PORT" ]; then
   PORT_SPEC="127.0.0.1:${HOST_PORT}:8000"

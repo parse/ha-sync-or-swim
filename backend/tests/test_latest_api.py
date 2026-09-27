@@ -4,6 +4,7 @@ from db.models import Installation, Measurement
 from db.session import SessionLocal
 from fastapi.testclient import TestClient
 from main import app
+from measurement_service import as_utc
 
 client = TestClient(app)
 
@@ -96,11 +97,8 @@ def test_latest_logs_read_summary(caplog):
     [event] = latest_read_events(caplog)
     assert event["found"] is True
     logged = datetime.fromisoformat(event["captured_at"])
-    returned = datetime.fromisoformat(response.json()["captured_at"])
     assert logged.tzinfo is not None
-    assert logged == (
-        returned if returned.tzinfo else returned.replace(tzinfo=timezone.utc)
-    )
+    assert logged == as_utc(datetime.fromisoformat(response.json()["captured_at"]))
     assert event["stale"] is False
     assert event["dosing_problem"] == response.json()["dosing_problem"]["state"]
     assert event["sensor_count"] == 0

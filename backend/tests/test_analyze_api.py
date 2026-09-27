@@ -193,20 +193,68 @@ def test_analyze_burst_endpoint_rejects_image_smaller_than_crop():
 
 
 def test_analyze_burst_endpoint_hides_unexpected_error_details(
-    monkeypatch, multipart_files_builder
+    multipart_files_builder,
 ):
-    from routes import analyze
+    from db.session import engine, get_db
+    from sqlalchemy.exc import OperationalError
+    from sqlalchemy.orm import Session
 
-    def fail(images_bytes: list[bytes]) -> None:
-        raise RuntimeError("secret internal detail")
+    class FailingCommitSession(Session):
+        def commit(self) -> None:
+            raise OperationalError("COMMIT", {}, Exception("secret internal detail"))
 
-    monkeypatch.setattr(analyze, "analyze_burst", fail)
+    def failing_db():
+        with FailingCommitSession(bind=engine) as db:
+            yield db
+
+    app.dependency_overrides[get_db] = failing_db
+    try:
+        response = client.post(
+            "/api/analyze/test-installation/burst",
+            headers={"Authorization": "Bearer test-token"},
+            files=multipart_files_builder("burst_5_light_off"),
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Analysis failed"
+    assert "secret" not in response.text
+
+
+def timing_events(caplog, event: str) -> list[dict]:
+    import json
+
+    return [
+        payload
+        for record in caplog.records
+        if record.name == "sync_or_swim.request_timing"
+        and (payload := json.loads(record.getMessage()))["event"] == event
+    ]
+
+
+def test_analyze_burst_logs_analysis_summary(caplog, multipart_files_builder):
+    import logging
+
+    caplog.set_level(logging.INFO, logger="sync_or_swim.request_timing")
+    files = multipart_files_builder("burst_5_light_off")
 
     response = client.post(
         "/api/analyze/test-installation/burst",
         headers={"Authorization": "Bearer test-token"},
-        files=multipart_files_builder("burst_9_light_off_bw"),
+        files=files,
     )
 
-    assert response.status_code == 500
-    assert response.json()["detail"] == "Analysis failed"
+    assert response.status_code == 200
+    [event] = timing_events(caplog, "analysis_completed")
+    assert event["installation_id"] == "test-installation"
+    assert event["frame_count"] == len(files)
+    assert event["upload_bytes"] > 0
+    for field in ("read_ms", "decode_ms", "analysis_ms", "store_ms", "duration_ms"):
+        assert event[field] >= 0
+    pool = response.json()["pool"]
+    for unit in ("chlorine", "ph"):
+        assert event[f"{unit}_status"] == pool[unit]["status"]
+        assert event[f"{unit}_mode"] == pool[unit]["pattern_detected"]
+        assert event[f"{unit}_level"] is None or 1 <= event[f"{unit}_level"] <= 7
+    assert event["dosing_problem"] == response.json()["dosing_problem"]["state"]

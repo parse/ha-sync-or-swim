@@ -518,9 +518,15 @@ def best_analysis_result(
 
 
 def analyze_burst(images_bytes: list[bytes], rois: RoiMap = ROIS) -> CVAnalysisResult:
+    return analyze_frames([preprocess_image(img) for img in images_bytes], rois)
+
+
+def analyze_frames(
+    processed_images: list[np.ndarray], rois: RoiMap = ROIS
+) -> CVAnalysisResult:
+    """Analyze frames already decoded and cropped by preprocess_image."""
     import cv2
 
-    processed_images = [preprocess_image(img) for img in images_bytes]
     hsv_images = [cv2.cvtColor(img, cv2.COLOR_BGR2HSV) for img in processed_images]
 
     if rois is ROIS and is_grayscale_privacy_hsv_frame(hsv_images):

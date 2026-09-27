@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from request_timing import elapsed_ms, log_timing
-from routes import analyze, debug, installations, latest, ui
+from routes import analyze, installations, latest, ui
 
 
 @asynccontextmanager
@@ -71,15 +71,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(latest.router, prefix="/latest", tags=["latest"])
 app.include_router(latest.router, prefix="/api/latest", tags=["latest"])
-app.include_router(debug.router, prefix="/debug", tags=["debug"])
-app.include_router(debug.router, prefix="/api/debug", tags=["debug"])
-
-
-app.include_router(
-    installations.router, prefix="/installations", tags=["installations"]
-)
 app.include_router(
     installations.router, prefix="/api/installations", tags=["installations"]
 )
@@ -92,22 +84,15 @@ app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
 
 
 @app.get("/", include_in_schema=False)
+@app.get("/ui", include_in_schema=False)
 async def web_ui() -> FileResponse:
     return FileResponse(UI_PATH, headers={"Cache-Control": "no-store"})
 
 
-@app.get("/ui", include_in_schema=False)
-async def web_ui_alias() -> FileResponse:
-    return FileResponse(UI_PATH, headers={"Cache-Control": "no-store"})
-
-
+# /health is kept for uptime monitors; clients use /api/health.
 @app.get("/health")
-async def health_check() -> dict[str, bool]:
-    return {"ok": True}
-
-
 @app.get("/api/health")
-async def api_health_check() -> dict[str, bool]:
+async def health_check() -> dict[str, bool]:
     return {"ok": True}
 
 

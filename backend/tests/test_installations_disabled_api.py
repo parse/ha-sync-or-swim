@@ -1,3 +1,4 @@
+import pytest
 from db.models import Measurement
 from db.session import SessionLocal
 from fastapi.testclient import TestClient
@@ -7,7 +8,7 @@ client = TestClient(app)
 
 
 def test_disabled_endpoint_requires_auth():
-    response = client.post("/installations/test-installation/disabled")
+    response = client.post("/api/installations/test-installation/disabled")
 
     assert response.status_code == 401
 
@@ -71,11 +72,21 @@ def test_disabled_endpoint_stores_latest_disabled_measurement():
         db.close()
 
 
-def test_legacy_disabled_endpoint_alias_still_works():
-    response = client.post(
-        "/installations/test-installation/disabled",
-        headers={"Authorization": "Bearer test-token"},
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("get", "/installations/"),
+        ("post", "/installations/test-installation/disabled"),
+        ("post", "/installations/test-installation/sensors"),
+        ("get", "/installations/test-installation/sensors/latest"),
+        ("get", "/latest/test-installation"),
+        ("get", "/debug/test-installation"),
+        ("get", "/api/debug/test-installation"),
+    ],
+)
+def test_removed_legacy_routes_are_not_found(method, path):
+    response = client.request(
+        method, path, headers={"Authorization": "Bearer test-token"}
     )
 
-    assert response.status_code == 200
-    assert response.json()["installation_id"] == "test-installation"
+    assert response.status_code == 404

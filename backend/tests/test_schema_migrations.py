@@ -1,5 +1,5 @@
-from db.migrations import migrate_shared_sensors_table
-from db.models import Measurement, SharedSensor
+from db.migrations import migrate_schema
+from db.models import Base, Installation, Measurement, SharedSensor
 from db.session import engine
 from fastapi.testclient import TestClient
 from main import app
@@ -12,7 +12,7 @@ def test_shared_sensors_migration_updates_existing_schema():
     SharedSensor.__table__.drop(bind=engine)
     assert SharedSensor.__tablename__ not in inspect(engine).get_table_names()
 
-    migrate_shared_sensors_table(engine)
+    migrate_schema(engine)
 
     assert SharedSensor.__tablename__ in inspect(engine).get_table_names()
 
@@ -81,9 +81,22 @@ def test_shared_sensors_migration_adds_preferred_alias_to_existing_table():
         for column in inspect(engine).get_columns(SharedSensor.__tablename__)
     }
 
-    migrate_shared_sensors_table(engine)
+    migrate_schema(engine)
 
     assert "preferred_alias" in {
         column["name"]
         for column in inspect(engine).get_columns(SharedSensor.__tablename__)
+    }
+
+
+def test_schema_migration_creates_all_tables_on_empty_database():
+    Base.metadata.drop_all(bind=engine)
+    assert inspect(engine).get_table_names() == []
+
+    migrate_schema(engine)
+
+    assert set(inspect(engine).get_table_names()) >= {
+        Installation.__tablename__,
+        Measurement.__tablename__,
+        SharedSensor.__tablename__,
     }

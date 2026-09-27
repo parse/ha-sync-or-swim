@@ -166,6 +166,12 @@ def preprocess_image(image_bytes: bytes) -> np.ndarray:
         raise ValueError("Could not decode image bytes")
 
     img = cv2.rotate(img, cv2.ROTATE_180)
+    height, width = img.shape[:2]
+    if height < CROP_Y + CROP_HEIGHT or width < CROP_X + CROP_WIDTH:
+        raise ValueError(
+            f"Image is {width}x{height}, expected at least "
+            f"{CROP_X + CROP_WIDTH}x{CROP_Y + CROP_HEIGHT}"
+        )
     return img[CROP_Y : CROP_Y + CROP_HEIGHT, CROP_X : CROP_X + CROP_WIDTH]
 
 

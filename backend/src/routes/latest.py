@@ -11,11 +11,11 @@ router = APIRouter()
 
 
 @router.get("/{installation_id}", response_model=LatestMeasurementSchema)
-async def get_latest_measurement(
+def get_latest_measurement(
     installation_id: str,
     staleness_threshold_minutes: int | None = None,
-    db: Session = Depends(get_db),
     _auth: None = Depends(verify_token),
+    db: Session = Depends(get_db),
 ) -> LatestMeasurementSchema:
     try:
         validate_installation_id(installation_id)

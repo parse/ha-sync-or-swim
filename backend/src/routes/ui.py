@@ -127,10 +127,10 @@ def render_pool_status_fragment(measurement: Measurement) -> str:
 
 
 @router.get("/pool-status/latest-fragment", response_class=HTMLResponse)
-async def get_latest_pool_status_fragment(
+def get_latest_pool_status_fragment(
     installation_id: str,
-    db: Session = Depends(get_db),
     _auth: None = Depends(verify_web_ui_token),
+    db: Session = Depends(get_db),
 ) -> HTMLResponse:
     try:
         validate_installation_id(installation_id)
@@ -154,10 +154,10 @@ async def get_latest_pool_status_fragment(
 
 
 @router.get("/sensors/latest-fragment", response_class=HTMLResponse)
-async def get_latest_sensors_fragment(
+def get_latest_sensors_fragment(
     installation_id: str,
-    db: Session = Depends(get_db),
     _auth: None = Depends(verify_web_ui_token),
+    db: Session = Depends(get_db),
 ) -> HTMLResponse:
     try:
         validate_installation_id(installation_id)
@@ -173,7 +173,7 @@ async def get_latest_sensors_fragment(
 
 
 @router.get("/share-qr-fragment", response_class=HTMLResponse)
-async def get_share_qr_fragment(
+def get_share_qr_fragment(
     request: Request,
     installation_id: str,
     authorization: str | None = Header(None),

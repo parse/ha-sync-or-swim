@@ -1,5 +1,5 @@
 # Pinned so Dependabot's docker updates bump uv along with the base image.
-FROM ghcr.io/astral-sh/uv:0.12.19 AS uv
+FROM ghcr.io/astral-sh/uv:0.12.20 AS uv
 
 FROM python:3.14-slim
 
